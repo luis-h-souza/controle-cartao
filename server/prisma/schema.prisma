@@ -1,0 +1,68 @@
+// Prisma schema for Credit Card Expense Tracking
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Usuario {
+  id            String         @id @default(uuid())
+  nome          String
+  email         String         @unique
+  senha         String
+  criadoEm      DateTime       @default(now())
+  atualizadoEm  DateTime       @updatedAt
+  cartoes       Cartao[]
+  refreshTokens RefreshToken[]
+
+  @@map("usuarios")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  expiraEm  DateTime
+  criadoEm  DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model Cartao {
+  id              String   @id @default(uuid())
+  nome            String
+  bandeira        String?  @default("Mastercard")
+  cor             String?  @default("#6366f1")
+  limite          Float
+  diaFechamento   Int
+  diaVencimento   Int
+  usuarioId       String?
+  usuario         Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+  gastos          Gasto[]
+
+  @@map("cartoes")
+}
+
+model Gasto {
+  id            String   @id @default(uuid())
+  descricao     String
+  valor         Float
+  categoria     String   @default("Outros")
+  dataCompra    DateTime @default(now())
+  parcelas      Int      @default(1)
+  parcelaAtual  Int      @default(1)
+  recorrente    Boolean  @default(false)
+  status        String   @default("FATURA_ABERTA")
+  cartaoId      String
+  cartao        Cartao   @relation(fields: [cartaoId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@map("gastos")
+}

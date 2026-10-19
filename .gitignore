@@ -1,0 +1,8 @@
+.neon
+node_modules/
+.env
+server/node_modules
+web/node_modules
+web/dist
+server/dist
+.env.local

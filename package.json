@@ -1,0 +1,27 @@
+{
+  "name": "controle-cartao-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "build": "npm --prefix web run build",
+    "build:web": "npm --prefix web run build",
+    "build:server": "npm --prefix server run build",
+    "dev:server": "npm --prefix server run dev",
+    "dev:web": "npm --prefix web run dev",
+    "start": "npm --prefix server run start",
+    "prisma:generate": "npm --prefix server run prisma:generate"
+  },
+  "dependencies": {
+    "@neon/config": "^1.9.2",
+    "@neon/env": "^1.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vercel/node": "^25.0.0",
+    "typescript": "^7.0.2"
+  }
+}
