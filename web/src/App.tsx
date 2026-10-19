@@ -264,14 +264,14 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-3 w-full sm:w-auto">
+          <div className="flex items-center justify-between sm:justify-end gap-1 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={abrirNovoCartao}
               aria-label="Novo cartão"
-              className="px-2.5 sm:px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm whitespace-nowrap [&>span]:hidden sm:[&>span]:inline"
+              className="px-1.5 sm:px-3.5 py-2 text-[11px] sm:text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 transition-all flex items-center gap-1 sm:gap-2 cursor-pointer shadow-sm whitespace-nowrap [&>svg]:hidden sm:[&>svg]:block"
             >
               <CreditCard className="w-4 h-4 text-indigo-400" />
-              <span>Novo Cartão</span>
+              <span><span className="sm:hidden">Cartão</span><span className="hidden sm:inline">Novo Cartão</span></span>
             </button>
             <button
               onClick={() => {
@@ -283,14 +283,14 @@ export default function App() {
                 setModalGastoAberto(true)
               }}
               aria-label="Novo gasto"
-              className="px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap [&>span]:hidden sm:[&>span]:inline"
+              className="px-1.5 sm:px-4 py-2 text-[11px] sm:text-sm font-semibold rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap [&>svg]:hidden sm:[&>svg]:block"
             >
               <Plus className="w-4 h-4" />
-              <span>Novo Gasto</span>
+              <span><span className="sm:hidden">Gasto</span><span className="hidden sm:inline">Novo Gasto</span></span>
             </button>
 
             {/* User Profile, Edit & Logout */}
-            <div className="flex items-center gap-1 pl-2 sm:pl-3 border-l border-slate-800 ml-1 shrink-0">
+            <div className="flex items-center gap-0.5 sm:gap-1 pl-1.5 sm:pl-3 border-l border-slate-800 ml-0.5 sm:ml-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setModalPerfilAberto(true)}
@@ -300,6 +300,7 @@ export default function App() {
                 <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/40 group-hover:border-indigo-400 text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 transition-colors">
                   {user.nome.substring(0, 2).toUpperCase()}
                 </div>
+                <span className="text-[11px] sm:hidden">Perfil</span>
                 <div className="hidden md:block text-left">
                   <div className="text-xs font-semibold text-slate-200 leading-tight truncate max-w-[120px] group-hover:text-indigo-300 transition-colors">
                     {user.nome}
@@ -322,10 +323,11 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => logout()}
-                className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-1.5 sm:p-2 text-[11px] sm:text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
                 title="Sair da conta"
               >
                 <LogOut className="w-4 h-4" />
+                <span className="sm:hidden">Sair</span>
               </button>
             </div>
           </div>
