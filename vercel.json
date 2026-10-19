@@ -7,7 +7,6 @@
   "framework": null,
   "functions": {
     "api/[...path].ts": {
-      "runtime": "@vercel/node@5",
       "memory": 512,
       "maxDuration": 30,
       "includeFiles": "server/node_modules/.prisma/**,server/prisma/**"
