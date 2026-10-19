@@ -14,6 +14,7 @@ import {
   RefreshCw,
   LogOut,
   Settings,
+  Pencil,
 } from 'lucide-react'
 import { api } from './services/api'
 import { useAuth } from './contexts/AuthContext'
@@ -62,9 +63,11 @@ export default function App() {
   const [cartaoGastoId, setCartaoGastoId] = useState('')
   const [dataGasto, setDataGasto] = useState(new Date().toISOString().split('T')[0])
   const [parcelasGasto, setParcelasGasto] = useState('1')
+  const [parcelaAtualGasto, setParcelaAtualGasto] = useState('1')
   const [recorrenteGasto, setRecorrenteGasto] = useState(false)
 
   // Form Cartao
+  const [cartaoEditando, setCartaoEditando] = useState<Cartao | null>(null)
   const [nomeCartao, setNomeCartao] = useState('')
   const [bandeiraCartao, setBandeiraCartao] = useState('Mastercard')
   const [corCartao, setCorCartao] = useState('#820AD1')
@@ -77,6 +80,28 @@ export default function App() {
   const showFeedback = (tipo: 'sucesso' | 'erro', texto: string) => {
     setFeedbackMsg({ tipo, texto })
     setTimeout(() => setFeedbackMsg(null), 4000)
+  }
+
+  const abrirNovoCartao = () => {
+    setCartaoEditando(null)
+    setNomeCartao('')
+    setBandeiraCartao('Mastercard')
+    setCorCartao('#820AD1')
+    setLimiteCartao('')
+    setDiaFechamento('5')
+    setDiaVencimento('12')
+    setModalCartaoAberto(true)
+  }
+
+  const abrirEdicaoCartao = (cartao: Cartao) => {
+    setCartaoEditando(cartao)
+    setNomeCartao(cartao.nome)
+    setBandeiraCartao(cartao.bandeira || 'Mastercard')
+    setCorCartao(cartao.cor || '#820AD1')
+    setLimiteCartao(String(cartao.limite))
+    setDiaFechamento(String(cartao.diaFechamento))
+    setDiaVencimento(String(cartao.diaVencimento))
+    setModalCartaoAberto(true)
   }
 
   const carregarDados = async () => {
@@ -133,6 +158,7 @@ export default function App() {
         categoria: categoriaGasto,
         dataCompra: new Date(dataGasto).toISOString(),
         parcelas: parseInt(parcelasGasto, 10),
+        parcelaAtual: parseInt(parcelasGasto, 10) > 1 ? parseInt(parcelaAtualGasto, 10) : 1,
         cartaoId: cartaoGastoId,
         recorrente: recorrenteGasto,
       })
@@ -142,6 +168,7 @@ export default function App() {
       setDescricaoGasto('')
       setValorGasto('')
       setParcelasGasto('1')
+      setParcelaAtualGasto('1')
       setRecorrenteGasto(false)
       carregarDados()
     } catch (err: any) {
@@ -149,7 +176,7 @@ export default function App() {
     }
   }
 
-  const handleCriarCartao = async (e: React.FormEvent) => {
+  const handleSalvarCartao = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nomeCartao || !limiteCartao) {
       showFeedback('erro', 'Informe o nome e o limite do cartão.')
@@ -157,20 +184,23 @@ export default function App() {
     }
 
     try {
-      const novoCartao = await api.createCartao({
+      const dadosCartao = {
         nome: nomeCartao,
         bandeira: bandeiraCartao,
         cor: corCartao,
         limite: parseFloat(limiteCartao.replace(',', '.')),
         diaFechamento: parseInt(diaFechamento, 10),
         diaVencimento: parseInt(diaVencimento, 10),
-      })
-
-      showFeedback('sucesso', `Cartão "${novoCartao.nome}" adicionado com sucesso!`)
+      }
+      const cartaoSalvo = cartaoEditando
+        ? await api.updateCartao(cartaoEditando.id, dadosCartao)
+        : await api.createCartao(dadosCartao)
+      showFeedback('sucesso', cartaoEditando ? `Cartão "${cartaoSalvo.nome}" atualizado!` : `Cartão "${cartaoSalvo.nome}" adicionado!`)
       setModalCartaoAberto(false)
+      setCartaoEditando(null)
       setNomeCartao('')
       setLimiteCartao('')
-      setCartaoGastoId(novoCartao.id)
+      if (!cartaoEditando) setCartaoGastoId(cartaoSalvo.id)
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao criar cartão.')
@@ -236,7 +266,7 @@ export default function App() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setModalCartaoAberto(true)}
+              onClick={abrirNovoCartao}
               className="px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
             >
               <CreditCard className="w-4 h-4 text-indigo-400" />
@@ -246,7 +276,7 @@ export default function App() {
               onClick={() => {
                 if (cartoes.length === 0) {
                   showFeedback('erro', 'Cadastre ao menos um cartão antes de registrar gastos.')
-                  setModalCartaoAberto(true)
+                  abrirNovoCartao()
                   return
                 }
                 setModalGastoAberto(true)
@@ -415,7 +445,7 @@ export default function App() {
                 Adicione seu primeiro cartão (como Nubank, Inter, XP ou C6) para começar a controlar seus gastos.
               </p>
               <button
-                onClick={() => setModalCartaoAberto(true)}
+                onClick={abrirNovoCartao}
                 className="mt-2 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all cursor-pointer inline-flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
@@ -459,7 +489,20 @@ export default function App() {
                             Filtrado
                           </span>
                         )}
-                        <button
+                        {cartao.usuarioId === user?.id && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              abrirEdicaoCartao(cartao)
+                            }}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"
+                            title="Editar cartão"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {cartao.usuarioId === user?.id && (
+                          <button
                           onClick={(e) => {
                             e.stopPropagation()
                             handleExcluirCartao(cartao.id, cartao.nome)
@@ -469,6 +512,7 @@ export default function App() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        )}
                       </div>
                     </div>
 
@@ -600,7 +644,7 @@ export default function App() {
                             <h4 className="text-sm font-semibold text-white truncate">{gasto.descricao}</h4>
                             {gasto.parcelas > 1 && (
                               <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 shrink-0">
-                                {gasto.parcelas}x
+                                {String(gasto.parcelaAtual).padStart(2, '0')}/{String(gasto.parcelas).padStart(2, '0')}
                               </span>
                             )}
                             {gasto.recorrente && (
@@ -777,22 +821,35 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-3 items-center pt-1">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Parcelas</label>
-                  <select
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Total de parcelas</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="48"
+                    required
                     value={parcelasGasto}
-                    onChange={(e) => setParcelasGasto(e.target.value)}
+                    onChange={(e) => {
+                      const total = Math.max(1, Number(e.target.value) || 1)
+                      setParcelasGasto(String(total))
+                      setParcelaAtualGasto((atual) => String(Math.min(Number(atual) || 1, total)))
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="1">À vista (1x)</option>
-                    <option value="2">2x</option>
-                    <option value="3">3x</option>
-                    <option value="4">4x</option>
-                    <option value="5">5x</option>
-                    <option value="6">6x</option>
-                    <option value="10">10x</option>
-                    <option value="12">12x</option>
-                  </select>
+                  />
                 </div>
+                {Number(parcelasGasto) > 1 && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Parcela atual (ex.: 8 de 10)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={parcelasGasto}
+                      required
+                      value={parcelaAtualGasto}
+                      onChange={(e) => setParcelaAtualGasto(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-2 pt-5">
                   <input
                     type="checkbox"
@@ -834,7 +891,7 @@ export default function App() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-indigo-400" />
-                Cadastrar Cartão de Crédito
+                {cartaoEditando ? 'Editar Cartão de Crédito' : 'Cadastrar Cartão de Crédito'}
               </h3>
               <button
                 onClick={() => setModalCartaoAberto(false)}
@@ -844,7 +901,7 @@ export default function App() {
               </button>
             </div>
 
-            <form onSubmit={handleCriarCartao} className="space-y-4">
+            <form onSubmit={handleSalvarCartao} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">Nome do Cartão *</label>
                 <input
@@ -942,7 +999,7 @@ export default function App() {
                   type="submit"
                   className="px-5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all"
                 >
-                  Adicionar Cartão
+                  {cartaoEditando ? 'Salvar Alterações' : 'Adicionar Cartão'}
                 </button>
               </div>
             </form>

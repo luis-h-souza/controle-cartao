@@ -2,6 +2,16 @@ import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../config/prisma.js'
 
+function valorParcela(gasto: { valor: number; parcelas: number; parcelaAtual: number }) {
+  if (gasto.parcelaAtual > gasto.parcelas) return 0
+  return gasto.parcelas > 1 ? gasto.valor / gasto.parcelas : gasto.valor
+}
+
+function saldoParcelasEmAberto(gasto: { valor: number; parcelas: number; parcelaAtual: number }) {
+  const parcelasRestantes = Math.max(0, gasto.parcelas - gasto.parcelaAtual + 1)
+  return valorParcela(gasto) * parcelasRestantes
+}
+
 export const createCartaoSchema = z.object({
   nome: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres'),
   bandeira: z.string().optional().default('Mastercard'),
@@ -36,9 +46,10 @@ export class CartaoController {
 
       // Calculate totals per card
       const enrichedCartoes = cartoes.map((cartao) => {
-        const totalGasto = cartao.gastos.reduce((acc, gasto) => acc + gasto.valor, 0)
-        const limiteDisponivel = Math.max(0, cartao.limite - totalGasto)
-        const percentualUtilizado = cartao.limite > 0 ? (totalGasto / cartao.limite) * 100 : 0
+        const totalGasto = cartao.gastos.reduce((acc, gasto) => acc + valorParcela(gasto), 0)
+        const saldoEmAberto = cartao.gastos.reduce((acc, gasto) => acc + saldoParcelasEmAberto(gasto), 0)
+        const limiteDisponivel = Math.max(0, cartao.limite - saldoEmAberto)
+        const percentualUtilizado = cartao.limite > 0 ? (saldoEmAberto / cartao.limite) * 100 : 0
 
         return {
           ...cartao,
@@ -83,9 +94,10 @@ export class CartaoController {
         return reply.status(404).send({ error: 'Cartão não encontrado' })
       }
 
-      const totalGasto = cartao.gastos.reduce((acc, gasto) => acc + gasto.valor, 0)
-      const limiteDisponivel = Math.max(0, cartao.limite - totalGasto)
-      const percentualUtilizado = cartao.limite > 0 ? (totalGasto / cartao.limite) * 100 : 0
+      const totalGasto = cartao.gastos.reduce((acc, gasto) => acc + valorParcela(gasto), 0)
+      const saldoEmAberto = cartao.gastos.reduce((acc, gasto) => acc + saldoParcelasEmAberto(gasto), 0)
+      const limiteDisponivel = Math.max(0, cartao.limite - saldoEmAberto)
+      const percentualUtilizado = cartao.limite > 0 ? (saldoEmAberto / cartao.limite) * 100 : 0
 
       return reply.send({
         ...cartao,
@@ -131,6 +143,20 @@ export class CartaoController {
     try {
       const { id } = request.params
       const data = updateCartaoSchema.parse(request.body)
+      const userId = request.user?.userId
+
+      if (!userId) {
+        return reply.status(401).send({ error: 'Usuário não autenticado' })
+      }
+
+      const ownedCartao = await prisma.cartao.findFirst({
+        where: { id, usuarioId: userId },
+        select: { id: true },
+      })
+
+      if (!ownedCartao) {
+        return reply.status(404).send({ error: 'Cartão não encontrado' })
+      }
 
       const cartao = await prisma.cartao.update({
         where: { id },
@@ -153,9 +179,17 @@ export class CartaoController {
   ) {
     try {
       const { id } = request.params
-      await prisma.cartao.delete({
-        where: { id },
-      })
+      const userId = request.user?.userId
+
+      if (!userId) {
+        return reply.status(401).send({ error: 'Usuário não autenticado' })
+      }
+
+      const result = await prisma.cartao.deleteMany({ where: { id, usuarioId: userId } })
+
+      if (result.count === 0) {
+        return reply.status(404).send({ error: 'Cartão não encontrado' })
+      }
 
       return reply.status(204).send()
     } catch (error) {

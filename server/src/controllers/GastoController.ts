@@ -16,6 +16,16 @@ export const createGastoSchema = z.object({
 
 export const updateGastoSchema = createGastoSchema.partial()
 
+function valorParcela(gasto: { valor: number; parcelas: number; parcelaAtual: number }) {
+  if (gasto.parcelaAtual > gasto.parcelas) return 0
+  return gasto.parcelas > 1 ? gasto.valor / gasto.parcelas : gasto.valor
+}
+
+function saldoParcelasEmAberto(gasto: { valor: number; parcelas: number; parcelaAtual: number }) {
+  const parcelasRestantes = Math.max(0, gasto.parcelas - gasto.parcelaAtual + 1)
+  return valorParcela(gasto) * parcelasRestantes
+}
+
 export class GastoController {
   static async list(
     request: FastifyRequest<{
@@ -110,11 +120,11 @@ export class GastoController {
         },
       })
 
-      const totalGasto = gastos.reduce((acc, g) => acc + g.valor, 0)
+      const totalGasto = gastos.reduce((acc, g) => acc + valorParcela(g), 0)
 
       // Group by category
       const porCategoriaMap = gastos.reduce<Record<string, number>>((acc, g) => {
-        acc[g.categoria] = (acc[g.categoria] || 0) + g.valor
+        acc[g.categoria] = (acc[g.categoria] || 0) + valorParcela(g)
         return acc
       }, {})
 
@@ -136,13 +146,14 @@ export class GastoController {
         where: cartaoWhere,
       })
       const limiteTotal = cartoes.reduce((acc, c) => acc + c.limite, 0)
-      const limiteDisponivel = Math.max(0, limiteTotal - totalGasto)
+      const saldoEmAberto = gastos.reduce((acc, gasto) => acc + saldoParcelasEmAberto(gasto), 0)
+      const limiteDisponivel = Math.max(0, limiteTotal - saldoEmAberto)
 
       return reply.send({
         totalGasto,
         limiteTotal,
         limiteDisponivel,
-        percentualUtilizado: limiteTotal > 0 ? Math.round((totalGasto / limiteTotal) * 1000) / 10 : 0,
+        percentualUtilizado: limiteTotal > 0 ? Math.round((saldoEmAberto / limiteTotal) * 1000) / 10 : 0,
         quantidadeGastos: gastos.length,
         porCategoria,
       })
@@ -162,6 +173,10 @@ export class GastoController {
         parcelaAtual: body?.parcelaAtual ? parseInt(body.parcelaAtual, 10) : 1,
         dataCompra: body?.dataCompra ? new Date(body.dataCompra) : new Date(),
       })
+
+      if (data.parcelaAtual > data.parcelas) {
+        return reply.status(400).send({ error: 'A parcela atual não pode ser maior que o total de parcelas' })
+      }
 
       // Check if card exists
       const cartaoExists = await prisma.cartao.findUnique({

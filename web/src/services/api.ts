@@ -178,6 +178,26 @@ export const api = {
     return res.json()
   },
 
+  async updateCartao(id: string, data: {
+    nome: string
+    bandeira?: string
+    cor?: string
+    limite: number
+    diaFechamento: number
+    diaVencimento: number
+  }): Promise<Cartao> {
+    const res = await fetchWithAuth(`${API_BASE}/cartoes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Falha ao atualizar cartão')
+    }
+    return res.json()
+  },
+
   async deleteCartao(id: string): Promise<void> {
     const res = await fetchWithAuth(`${API_BASE}/cartoes/${id}`, {
       method: 'DELETE',
@@ -216,6 +236,7 @@ export const api = {
     categoria: string
     dataCompra: string
     parcelas: number
+    parcelaAtual: number
     cartaoId: string
     recorrente?: boolean
   }): Promise<Gasto> {
