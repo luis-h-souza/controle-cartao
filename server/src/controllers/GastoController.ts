@@ -27,40 +27,38 @@ function saldoParcelasEmAberto(gasto: { valor: number; parcelas: number; parcela
 }
 
 /**
- * Calcula o período de fatura de um cartão baseado no dia de fechamento.
- * Regra: compras DO dia de fechamento em diante entram na PRÓXIMA fatura.
- * Ex.: fechamento dia 29 → fatura de Outubro cobre de 29/Set até 28/Out.
+ * Calcula o período de fatura baseado no dia de fechamento.
  *
- * @param mesFatura  mês da fatura desejada (1-12)
- * @param anoFatura  ano da fatura desejada
- * @param diaFechamento  dia de fechamento do cartão (1-31)
- * @returns { startDate, endDate } intervalo fechado [início, fim] da fatura
+ * Convenção: "Fatura de Novembro" = a fatura que FECHA no dia diaFechamento
+ * de OUTUBRO (mês anterior) e é PAGA em novembro.
+ *
+ * Exemplo com diaFechamento = 29:
+ *   Fatura Novembro: 30/set → 29/out  (fecha 29/out, paga em nov)
+ *   Fatura Dezembro: 30/out → 29/nov  (fecha 29/nov, paga em dez)
+ *
+ * Regra: compras NO dia de fechamento → ainda entram na fatura atual.
+ *        compras no dia SEGUINTE ao fechamento → já vão para a próxima fatura.
  */
 function periodoFatura(mesFatura: number, anoFatura: number, diaFechamento: number) {
-  // Fim da fatura: dia ANTERIOR ao fechamento no mês da fatura
-  // Garante que dia de fechamento >= dias do mês (ex.: dia 31 em mês com 28 dias)
-  const diaFim = diaFechamento - 1
+  // Fim da fatura = diaFechamento do mês ANTERIOR ao mês da fatura
+  let endMes = mesFatura - 1
+  let endAno = anoFatura
+  if (endMes <= 0) { endMes = 12; endAno -= 1 }
 
-  let endDate: Date
-  if (diaFim <= 0) {
-    // fechamento no dia 1 → fim = último dia do mês anterior ao da fatura
-    endDate = new Date(anoFatura, mesFatura - 1, 0, 23, 59, 59, 999)
-  } else {
-    // último dia válido do mês (evita overflows como 31/fev)
-    const ultimoDiaMes = new Date(anoFatura, mesFatura, 0).getDate()
-    endDate = new Date(anoFatura, mesFatura - 1, Math.min(diaFim, ultimoDiaMes), 23, 59, 59, 999)
-  }
+  const ultimoDiaEndMes = new Date(endAno, endMes, 0).getDate()
+  const diaFimReal = Math.min(diaFechamento, ultimoDiaEndMes)
+  const endDate = new Date(endAno, endMes - 1, diaFimReal, 23, 59, 59, 999)
 
-  // Início da fatura: dia do fechamento do mês anterior
-  let startMes = mesFatura - 1
-  let startAno = anoFatura
-  if (startMes <= 0) {
-    startMes = 12
-    startAno -= 1
-  }
-  const ultimoDiaMesAnterior = new Date(startAno, startMes, 0).getDate()
-  const diaInicio = Math.min(diaFechamento, ultimoDiaMesAnterior)
-  const startDate = new Date(startAno, startMes - 1, diaInicio, 0, 0, 0, 0)
+  // Início da fatura = dia SEGUINTE ao diaFechamento de 2 meses atrás
+  let prevMes = mesFatura - 2
+  let prevAno = anoFatura
+  if (prevMes <= 0) { prevMes += 12; prevAno -= 1 }
+
+  const ultimoDiaPrevMes = new Date(prevAno, prevMes, 0).getDate()
+  const diaPrevFech = Math.min(diaFechamento, ultimoDiaPrevMes)
+  const startDate = new Date(prevAno, prevMes - 1, diaPrevFech)
+  startDate.setDate(startDate.getDate() + 1) // dia seguinte ao fechamento anterior
+  startDate.setHours(0, 0, 0, 0)
 
   return { startDate, endDate }
 }

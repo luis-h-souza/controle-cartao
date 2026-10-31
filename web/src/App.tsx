@@ -634,19 +634,24 @@ export default function App() {
                       </p>
                       {(() => {
                         // Mostra o período da fatura selecionada para este cartão
+                        // "Fatura Novembro" fecha dia 29/out → cobre 30/set a 29/out
                         const diaFech = cartao.diaFechamento
-                        const diaFim = diaFech - 1
-                        let endDate: Date
-                        if (diaFim <= 0) {
-                          endDate = new Date(anoFatura, mesFatura - 1, 0)
-                        } else {
-                          const ultimoDia = new Date(anoFatura, mesFatura, 0).getDate()
-                          endDate = new Date(anoFatura, mesFatura - 1, Math.min(diaFim, ultimoDia))
-                        }
-                        let startMes = mesFatura - 1, startAno = anoFatura
-                        if (startMes <= 0) { startMes = 12; startAno -= 1 }
-                        const ultimoDiaMesAnt = new Date(startAno, startMes, 0).getDate()
-                        const startDate = new Date(startAno, startMes - 1, Math.min(diaFech, ultimoDiaMesAnt))
+
+                        // Fim = diaFechamento do mês anterior ao da fatura
+                        let endMes = mesFatura - 1
+                        let endAno = anoFatura
+                        if (endMes <= 0) { endMes = 12; endAno -= 1 }
+                        const ultimoDiaFim = new Date(endAno, endMes, 0).getDate()
+                        const endDate = new Date(endAno, endMes - 1, Math.min(diaFech, ultimoDiaFim))
+
+                        // Início = dia SEGUINTE ao diaFechamento de 2 meses atrás
+                        let prevMes = mesFatura - 2
+                        let prevAno = anoFatura
+                        if (prevMes <= 0) { prevMes += 12; prevAno -= 1 }
+                        const ultimoDiaPrev = new Date(prevAno, prevMes, 0).getDate()
+                        const startDate = new Date(prevAno, prevMes - 1, Math.min(diaFech, ultimoDiaPrev))
+                        startDate.setDate(startDate.getDate() + 1)
+
                         const fmt = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
                         return (
                           <p className="text-[10px] text-slate-400/70 mt-0.5">
