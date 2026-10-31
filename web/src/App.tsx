@@ -15,6 +15,9 @@ import {
   LogOut,
   Settings,
   Pencil,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
 } from 'lucide-react'
 import { api } from './services/api'
 import { useAuth } from './contexts/AuthContext'
@@ -75,12 +78,49 @@ export default function App() {
   const [diaFechamento, setDiaFechamento] = useState('5')
   const [diaVencimento, setDiaVencimento] = useState('12')
 
+  // Navegação de fatura por mês
+  const hoje = new Date()
+  const [mesFatura, setMesFatura] = useState(hoje.getMonth() + 1)   // 1-12
+  const [anoFatura, setAnoFatura] = useState(hoje.getFullYear())
+
   const [feedbackMsg, setFeedbackMsg] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null)
 
   const showFeedback = (tipo: 'sucesso' | 'erro', texto: string) => {
     setFeedbackMsg({ tipo, texto })
     setTimeout(() => setFeedbackMsg(null), 4000)
   }
+
+  const MESES = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  ]
+
+  const irParaMesAnterior = () => {
+    if (mesFatura === 1) {
+      setMesFatura(12)
+      setAnoFatura((a) => a - 1)
+    } else {
+      setMesFatura((m) => m - 1)
+    }
+  }
+
+  const irParaProximoMes = () => {
+    if (mesFatura === 12) {
+      setMesFatura(1)
+      setAnoFatura((a) => a + 1)
+    } else {
+      setMesFatura((m) => m + 1)
+    }
+  }
+
+  const irParaMesAtual = () => {
+    const agora = new Date()
+    setMesFatura(agora.getMonth() + 1)
+    setAnoFatura(agora.getFullYear())
+  }
+
+  const isMesAtual =
+    mesFatura === new Date().getMonth() + 1 && anoFatura === new Date().getFullYear()
 
   const abrirNovoCartao = () => {
     setCartaoEditando(null)
@@ -112,8 +152,14 @@ export default function App() {
         api.getGastos({
           cartaoId: cartaoSelecionado !== 'TODOS' ? cartaoSelecionado : undefined,
           categoria: categoriaFiltro !== 'TODAS' ? categoriaFiltro : undefined,
+          mes: mesFatura,
+          ano: anoFatura,
         }),
-        api.getResumo(cartaoSelecionado !== 'TODOS' ? cartaoSelecionado : undefined),
+        api.getResumo(
+          cartaoSelecionado !== 'TODOS' ? cartaoSelecionado : undefined,
+          mesFatura,
+          anoFatura
+        ),
       ])
 
       setCartoes(listaCartoes)
@@ -135,7 +181,7 @@ export default function App() {
     if (user) {
       carregarDados()
     }
-  }, [user, cartaoSelecionado, categoriaFiltro])
+  }, [user, cartaoSelecionado, categoriaFiltro, mesFatura, anoFatura])
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -354,11 +400,66 @@ export default function App() {
           </div>
         )}
 
+        {/* Seletor de Mês de Fatura */}
+        <section className="bg-slate-900/60 border border-slate-800 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-slate-400">
+            <CalendarDays className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span className="text-xs font-medium uppercase tracking-wider">Fatura de referência</span>
+            {cartaoSelecionado !== 'TODOS' && (() => {
+              const cartao = cartoes.find(c => c.id === cartaoSelecionado)
+              return cartao ? (
+                <span className="text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                  Fecha dia {cartao.diaFechamento}
+                </span>
+              ) : null
+            })()}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={irParaMesAnterior}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer border border-slate-700/60"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-1.5 min-w-[180px] justify-center">
+              <span className="text-base font-bold text-white">
+                {MESES[mesFatura - 1]}
+              </span>
+              <span className="text-sm font-medium text-slate-400">{anoFatura}</span>
+              {isMesAtual && (
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded-full font-medium">
+                  atual
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={irParaProximoMes}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer border border-slate-700/60"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {!isMesAtual && (
+              <button
+                onClick={irParaMesAtual}
+                className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-2.5 py-1.5 rounded-lg border border-indigo-500/20 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+        </section>
+
         {/* Financial KPI Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Fatura Atual (Gastos)</span>
+              <span className="text-xs font-medium uppercase tracking-wider">Fatura {MESES[mesFatura - 1]}</span>
               <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
                 <TrendingDown className="w-4 h-4" />
               </div>
@@ -526,6 +627,28 @@ export default function App() {
                       <p className="text-xs text-slate-300/80">
                         Fecha dia <strong className="text-white">{cartao.diaFechamento}</strong> • Vence dia <strong className="text-white">{cartao.diaVencimento}</strong>
                       </p>
+                      {(() => {
+                        // Mostra o período da fatura selecionada para este cartão
+                        const diaFech = cartao.diaFechamento
+                        const diaFim = diaFech - 1
+                        let endDate: Date
+                        if (diaFim <= 0) {
+                          endDate = new Date(anoFatura, mesFatura - 1, 0)
+                        } else {
+                          const ultimoDia = new Date(anoFatura, mesFatura, 0).getDate()
+                          endDate = new Date(anoFatura, mesFatura - 1, Math.min(diaFim, ultimoDia))
+                        }
+                        let startMes = mesFatura - 1, startAno = anoFatura
+                        if (startMes <= 0) { startMes = 12; startAno -= 1 }
+                        const ultimoDiaMesAnt = new Date(startAno, startMes, 0).getDate()
+                        const startDate = new Date(startAno, startMes - 1, Math.min(diaFech, ultimoDiaMesAnt))
+                        const fmt = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+                        return (
+                          <p className="text-[10px] text-slate-400/70 mt-0.5">
+                            Período: {fmt(startDate)} → {fmt(endDate)}
+                          </p>
+                        )
+                      })()}
                     </div>
 
                     {/* Spending & Limit Progress */}
@@ -568,8 +691,8 @@ export default function App() {
                 </h2>
                 <p className="text-xs text-slate-400">
                   {cartaoSelecionado !== 'TODOS'
-                    ? `Filtrado pelo cartão selecionado`
-                    : 'Listando compras de todos os cartões'}
+                    ? `Fatura de ${MESES[mesFatura - 1]}/${anoFatura} — cartão selecionado`
+                    : `Fatura de ${MESES[mesFatura - 1]}/${anoFatura} — todos os cartões`}
                 </p>
               </div>
 

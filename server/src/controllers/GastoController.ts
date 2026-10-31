@@ -26,6 +26,45 @@ function saldoParcelasEmAberto(gasto: { valor: number; parcelas: number; parcela
   return valorParcela(gasto) * parcelasRestantes
 }
 
+/**
+ * Calcula o período de fatura de um cartão baseado no dia de fechamento.
+ * Regra: compras DO dia de fechamento em diante entram na PRÓXIMA fatura.
+ * Ex.: fechamento dia 29 → fatura de Outubro cobre de 29/Set até 28/Out.
+ *
+ * @param mesFatura  mês da fatura desejada (1-12)
+ * @param anoFatura  ano da fatura desejada
+ * @param diaFechamento  dia de fechamento do cartão (1-31)
+ * @returns { startDate, endDate } intervalo fechado [início, fim] da fatura
+ */
+function periodoFatura(mesFatura: number, anoFatura: number, diaFechamento: number) {
+  // Fim da fatura: dia ANTERIOR ao fechamento no mês da fatura
+  // Garante que dia de fechamento >= dias do mês (ex.: dia 31 em mês com 28 dias)
+  const diaFim = diaFechamento - 1
+
+  let endDate: Date
+  if (diaFim <= 0) {
+    // fechamento no dia 1 → fim = último dia do mês anterior ao da fatura
+    endDate = new Date(anoFatura, mesFatura - 1, 0, 23, 59, 59, 999)
+  } else {
+    // último dia válido do mês (evita overflows como 31/fev)
+    const ultimoDiaMes = new Date(anoFatura, mesFatura, 0).getDate()
+    endDate = new Date(anoFatura, mesFatura - 1, Math.min(diaFim, ultimoDiaMes), 23, 59, 59, 999)
+  }
+
+  // Início da fatura: dia do fechamento do mês anterior
+  let startMes = mesFatura - 1
+  let startAno = anoFatura
+  if (startMes <= 0) {
+    startMes = 12
+    startAno -= 1
+  }
+  const ultimoDiaMesAnterior = new Date(startAno, startMes, 0).getDate()
+  const diaInicio = Math.min(diaFechamento, ultimoDiaMesAnterior)
+  const startDate = new Date(startAno, startMes - 1, diaInicio, 0, 0, 0, 0)
+
+  return { startDate, endDate }
+}
+
 export class GastoController {
   static async list(
     request: FastifyRequest<{
@@ -61,12 +100,30 @@ export class GastoController {
       if (mes && ano) {
         const mesInt = parseInt(mes, 10)
         const anoInt = parseInt(ano, 10)
-        const startDate = new Date(anoInt, mesInt - 1, 1)
-        const endDate = new Date(anoInt, mesInt, 0, 23, 59, 59)
 
-        where.dataCompra = {
-          gte: startDate,
-          lte: endDate,
+        if (cartaoId) {
+          // Com cartão específico, usa a regra de fechamento do cartão
+          const cartao = await prisma.cartao.findUnique({
+            where: { id: cartaoId },
+            select: { diaFechamento: true },
+          })
+
+          if (cartao) {
+            const { startDate, endDate } = periodoFatura(mesInt, anoInt, cartao.diaFechamento)
+            where.dataCompra = { gte: startDate, lte: endDate }
+          } else {
+            // Fallback para mês calendário
+            where.dataCompra = {
+              gte: new Date(anoInt, mesInt - 1, 1),
+              lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
+            }
+          }
+        } else {
+          // Sem cartão específico: filtra por mês calendário (todos os cartões têm fechamentos diferentes)
+          where.dataCompra = {
+            gte: new Date(anoInt, mesInt - 1, 1),
+            lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
+          }
         }
       }
 
@@ -79,6 +136,7 @@ export class GastoController {
               nome: true,
               bandeira: true,
               cor: true,
+              diaFechamento: true,
             },
           },
         },
@@ -96,11 +154,11 @@ export class GastoController {
   }
 
   static async summary(
-    request: FastifyRequest<{ Querystring: { cartaoId?: string } }>,
+    request: FastifyRequest<{ Querystring: { cartaoId?: string; mes?: string; ano?: string } }>,
     reply: FastifyReply
   ) {
     try {
-      const { cartaoId } = request.query
+      const { cartaoId, mes, ano } = request.query
       const userId = request.user?.userId
 
       const where: any = {}
@@ -110,6 +168,33 @@ export class GastoController {
       if (userId) {
         where.cartao = {
           OR: [{ usuarioId: userId }, { usuarioId: null }],
+        }
+      }
+
+      // Filtro por período de fatura quando mes/ano informados
+      if (mes && ano) {
+        const mesInt = parseInt(mes, 10)
+        const anoInt = parseInt(ano, 10)
+
+        if (cartaoId) {
+          const cartao = await prisma.cartao.findUnique({
+            where: { id: cartaoId },
+            select: { diaFechamento: true },
+          })
+          if (cartao) {
+            const { startDate, endDate } = periodoFatura(mesInt, anoInt, cartao.diaFechamento)
+            where.dataCompra = { gte: startDate, lte: endDate }
+          } else {
+            where.dataCompra = {
+              gte: new Date(anoInt, mesInt - 1, 1),
+              lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
+            }
+          }
+        } else {
+          where.dataCompra = {
+            gte: new Date(anoInt, mesInt - 1, 1),
+            lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
+          }
         }
       }
 

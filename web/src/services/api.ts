@@ -206,7 +206,7 @@ export const api = {
   },
 
   // Gastos
-  async getGastos(params?: { cartaoId?: string; categoria?: string }): Promise<Gasto[]> {
+  async getGastos(params?: { cartaoId?: string; categoria?: string; mes?: number; ano?: number }): Promise<Gasto[]> {
     const url = new URL(`${window.location.origin}${API_BASE}/gastos`)
     if (params?.cartaoId && params.cartaoId !== 'TODOS') {
       url.searchParams.set('cartaoId', params.cartaoId)
@@ -214,16 +214,28 @@ export const api = {
     if (params?.categoria && params.categoria !== 'TODAS') {
       url.searchParams.set('categoria', params.categoria)
     }
+    if (params?.mes) {
+      url.searchParams.set('mes', String(params.mes))
+    }
+    if (params?.ano) {
+      url.searchParams.set('ano', String(params.ano))
+    }
 
     const res = await fetchWithAuth(url.toString())
     if (!res.ok) throw new Error('Falha ao buscar gastos')
     return res.json()
   },
 
-  async getResumo(cartaoId?: string): Promise<ResumoFinanceiro> {
+  async getResumo(cartaoId?: string, mes?: number, ano?: number): Promise<ResumoFinanceiro> {
     const url = new URL(`${window.location.origin}${API_BASE}/gastos/resumo`)
     if (cartaoId && cartaoId !== 'TODOS') {
       url.searchParams.set('cartaoId', cartaoId)
+    }
+    if (mes) {
+      url.searchParams.set('mes', String(mes))
+    }
+    if (ano) {
+      url.searchParams.set('ano', String(ano))
     }
     const res = await fetchWithAuth(url.toString())
     if (!res.ok) throw new Error('Falha ao obter resumo financeiro')
