@@ -147,18 +147,23 @@ export default function App() {
   const carregarDados = async () => {
     try {
       setLoading(true)
+
+      // Modo TODOS: busca as últimas compras sem filtro de mês (serão limitadas a 10 no display)
+      // Modo cartão específico: filtra pelo mês de fatura selecionado
+      const isTodos = cartaoSelecionado === 'TODOS'
+
       const [listaCartoes, listaGastos, resumoData] = await Promise.all([
         api.getCartoes(),
         api.getGastos({
-          cartaoId: cartaoSelecionado !== 'TODOS' ? cartaoSelecionado : undefined,
+          cartaoId: !isTodos ? cartaoSelecionado : undefined,
           categoria: categoriaFiltro !== 'TODAS' ? categoriaFiltro : undefined,
-          mes: mesFatura,
-          ano: anoFatura,
+          mes: !isTodos ? mesFatura : undefined,
+          ano: !isTodos ? anoFatura : undefined,
         }),
         api.getResumo(
-          cartaoSelecionado !== 'TODOS' ? cartaoSelecionado : undefined,
-          mesFatura,
-          anoFatura
+          !isTodos ? cartaoSelecionado : undefined,
+          !isTodos ? mesFatura : undefined,
+          !isTodos ? anoFatura : undefined,
         ),
       ])
 
@@ -691,8 +696,8 @@ export default function App() {
                 </h2>
                 <p className="text-xs text-slate-400">
                   {cartaoSelecionado !== 'TODOS'
-                    ? `Fatura de ${MESES[mesFatura - 1]}/${anoFatura} — cartão selecionado`
-                    : `Fatura de ${MESES[mesFatura - 1]}/${anoFatura} — todos os cartões`}
+                    ? `Fatura ${MESES[mesFatura - 1]}/${anoFatura} — ${gastos.length} compra${gastos.length !== 1 ? 's' : ''}`
+                    : `Últimas 10 compras — selecione um cartão para ver a fatura completa`}
                 </p>
               </div>
 
@@ -743,7 +748,7 @@ export default function App() {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {gastos.map((gasto) => {
+                {(cartaoSelecionado === 'TODOS' ? gastos.slice(0, 10) : gastos).map((gasto) => {
                   const catConfig = CATEGORIAS.find((c) => c.nome === gasto.categoria) || CATEGORIAS[7]
                   const dataFormatada = new Date(gasto.dataCompra).toLocaleDateString('pt-BR', {
                     day: '2-digit',
@@ -812,6 +817,14 @@ export default function App() {
                     </div>
                   )
                 })}
+                {cartaoSelecionado === 'TODOS' && gastos.length > 10 && (
+                  <div className="pt-2 text-center">
+                    <p className="text-xs text-slate-500">
+                      Exibindo as 10 compras mais recentes de {gastos.length} no total.{' '}
+                      <span className="text-indigo-400">Selecione um cartão para ver a fatura completa.</span>
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
