@@ -26,41 +26,27 @@ function saldoParcelasEmAberto(gasto: { valor: number; parcelas: number; parcela
   return valorParcela(gasto) * parcelasRestantes
 }
 
-/**
- * Calcula o período de fatura baseado no dia de fechamento.
- *
- * Convenção: "Fatura de Novembro" = a fatura que FECHA no dia diaFechamento
- * de OUTUBRO (mês anterior) e é PAGA em novembro.
- *
- * Exemplo com diaFechamento = 29:
- *   Fatura Novembro: 30/set → 29/out  (fecha 29/out, paga em nov)
- *   Fatura Dezembro: 30/out → 29/nov  (fecha 29/nov, paga em dez)
- *
- * Regra: compras NO dia de fechamento → ainda entram na fatura atual.
- *        compras no dia SEGUINTE ao fechamento → já vão para a próxima fatura.
- */
-function periodoFatura(mesFatura: number, anoFatura: number, diaFechamento: number) {
-  // Fim da fatura = diaFechamento do mês ANTERIOR ao mês da fatura
-  let endMes = mesFatura - 1
-  let endAno = anoFatura
-  if (endMes <= 0) { endMes = 12; endAno -= 1 }
+function parcelaNaFatura(
+  gasto: {
+    dataCompra: Date
+    parcelas: number
+    parcelaAtual: number
+    cartao: { diaFechamento: number }
+  },
+  mesFatura: number,
+  anoFatura: number
+) {
+  const dataCompra = new Date(gasto.dataCompra)
+  const anoCompra = dataCompra.getUTCFullYear()
+  const mesCompra = dataCompra.getUTCMonth()
+  const ultimoDiaDoMes = new Date(Date.UTC(anoCompra, mesCompra + 1, 0)).getUTCDate()
+  const diaFechamento = Math.min(gasto.cartao.diaFechamento, ultimoDiaDoMes)
+  const primeiraFaturaOffset = dataCompra.getUTCDate() > diaFechamento ? 2 : 1
+  const primeiraFatura = anoCompra * 12 + mesCompra + primeiraFaturaOffset
+  const faturaSelecionada = anoFatura * 12 + mesFatura - 1
+  const parcela = gasto.parcelaAtual + faturaSelecionada - primeiraFatura
 
-  const ultimoDiaEndMes = new Date(endAno, endMes, 0).getDate()
-  const diaFimReal = Math.min(diaFechamento, ultimoDiaEndMes)
-  const endDate = new Date(endAno, endMes - 1, diaFimReal, 23, 59, 59, 999)
-
-  // Início da fatura = dia SEGUINTE ao diaFechamento de 2 meses atrás
-  let prevMes = mesFatura - 2
-  let prevAno = anoFatura
-  if (prevMes <= 0) { prevMes += 12; prevAno -= 1 }
-
-  const ultimoDiaPrevMes = new Date(prevAno, prevMes, 0).getDate()
-  const diaPrevFech = Math.min(diaFechamento, ultimoDiaPrevMes)
-  const startDate = new Date(prevAno, prevMes - 1, diaPrevFech)
-  startDate.setDate(startDate.getDate() + 1) // dia seguinte ao fechamento anterior
-  startDate.setHours(0, 0, 0, 0)
-
-  return { startDate, endDate }
+  return parcela >= gasto.parcelaAtual && parcela <= gasto.parcelas ? parcela : null
 }
 
 export class GastoController {
@@ -95,29 +81,13 @@ export class GastoController {
         where.categoria = categoria
       }
 
+      const filtrarParcelasDaFatura = Boolean(mes && ano && cartaoId)
       if (mes && ano) {
         const mesInt = parseInt(mes, 10)
         const anoInt = parseInt(ano, 10)
 
-        if (cartaoId) {
-          // Com cartão específico, usa a regra de fechamento do cartão
-          const cartao = await prisma.cartao.findUnique({
-            where: { id: cartaoId },
-            select: { diaFechamento: true },
-          })
-
-          if (cartao) {
-            const { startDate, endDate } = periodoFatura(mesInt, anoInt, cartao.diaFechamento)
-            where.dataCompra = { gte: startDate, lte: endDate }
-          } else {
-            // Fallback para mês calendário
-            where.dataCompra = {
-              gte: new Date(anoInt, mesInt - 1, 1),
-              lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
-            }
-          }
-        } else {
-          // Sem cartão específico: filtra por mês calendário (todos os cartões têm fechamentos diferentes)
+        if (!filtrarParcelasDaFatura) {
+          // Sem uma fatura de cartão específica, mantém o filtro por mês calendário.
           where.dataCompra = {
             gte: new Date(anoInt, mesInt - 1, 1),
             lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
@@ -141,7 +111,18 @@ export class GastoController {
         orderBy: { dataCompra: 'desc' },
       })
 
-      return reply.send(gastos)
+      if (!filtrarParcelasDaFatura || !mes || !ano) {
+        return reply.send(gastos)
+      }
+
+      const mesInt = parseInt(mes, 10)
+      const anoInt = parseInt(ano, 10)
+      const gastosDaFatura = gastos.flatMap((gasto) => {
+        const parcelaAtual = parcelaNaFatura(gasto, mesInt, anoInt)
+        return parcelaAtual === null ? [] : [{ ...gasto, parcelaAtual }]
+      })
+
+      return reply.send(gastosDaFatura)
     } catch (error) {
       reply.log.error(error)
       return reply.status(500).send({
@@ -169,26 +150,12 @@ export class GastoController {
         }
       }
 
-      // Filtro por período de fatura quando mes/ano informados
+      const filtrarParcelasDaFatura = Boolean(mes && ano && cartaoId)
       if (mes && ano) {
         const mesInt = parseInt(mes, 10)
         const anoInt = parseInt(ano, 10)
 
-        if (cartaoId) {
-          const cartao = await prisma.cartao.findUnique({
-            where: { id: cartaoId },
-            select: { diaFechamento: true },
-          })
-          if (cartao) {
-            const { startDate, endDate } = periodoFatura(mesInt, anoInt, cartao.diaFechamento)
-            where.dataCompra = { gte: startDate, lte: endDate }
-          } else {
-            where.dataCompra = {
-              gte: new Date(anoInt, mesInt - 1, 1),
-              lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
-            }
-          }
-        } else {
+        if (!filtrarParcelasDaFatura) {
           where.dataCompra = {
             gte: new Date(anoInt, mesInt - 1, 1),
             lte: new Date(anoInt, mesInt, 0, 23, 59, 59),
@@ -203,10 +170,18 @@ export class GastoController {
         },
       })
 
-      const totalGasto = gastos.reduce((acc, g) => acc + valorParcela(g), 0)
+      const gastosDaFatura =
+        filtrarParcelasDaFatura && mes && ano
+          ? gastos.flatMap((gasto) => {
+              const parcelaAtual = parcelaNaFatura(gasto, parseInt(mes, 10), parseInt(ano, 10))
+              return parcelaAtual === null ? [] : [{ ...gasto, parcelaAtual }]
+            })
+          : gastos
+
+      const totalGasto = gastosDaFatura.reduce((acc, g) => acc + valorParcela(g), 0)
 
       // Group by category
-      const porCategoriaMap = gastos.reduce<Record<string, number>>((acc, g) => {
+      const porCategoriaMap = gastosDaFatura.reduce<Record<string, number>>((acc, g) => {
         acc[g.categoria] = (acc[g.categoria] || 0) + valorParcela(g)
         return acc
       }, {})
@@ -229,7 +204,7 @@ export class GastoController {
         where: cartaoWhere,
       })
       const limiteTotal = cartoes.reduce((acc, c) => acc + c.limite, 0)
-      const saldoEmAberto = gastos.reduce((acc, gasto) => acc + saldoParcelasEmAberto(gasto), 0)
+      const saldoEmAberto = gastosDaFatura.reduce((acc, gasto) => acc + saldoParcelasEmAberto(gasto), 0)
       const limiteDisponivel = Math.max(0, limiteTotal - saldoEmAberto)
 
       return reply.send({
@@ -237,7 +212,7 @@ export class GastoController {
         limiteTotal,
         limiteDisponivel,
         percentualUtilizado: limiteTotal > 0 ? Math.round((saldoEmAberto / limiteTotal) * 1000) / 10 : 0,
-        quantidadeGastos: gastos.length,
+        quantidadeGastos: gastosDaFatura.length,
         porCategoria,
       })
     } catch (error) {

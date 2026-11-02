@@ -755,6 +755,10 @@ export default function App() {
               <div className="space-y-2.5">
                 {(cartaoSelecionado === 'TODOS' ? gastos.slice(0, 10) : gastos).map((gasto) => {
                   const catConfig = CATEGORIAS.find((c) => c.nome === gasto.categoria) || CATEGORIAS[7]
+                  const valorExibido =
+                    cartaoSelecionado !== 'TODOS' && gasto.parcelas > 1
+                      ? gasto.valor / gasto.parcelas
+                      : gasto.valor
                   const dataFormatada = new Date(gasto.dataCompra).toLocaleDateString('pt-BR', {
                     day: '2-digit',
                     month: 'short',
@@ -804,7 +808,7 @@ export default function App() {
 
                       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 w-full sm:w-auto pl-[52px] sm:pl-0">
                         <div className="text-right">
-                          <div className="text-base font-bold text-white">{formatarMoeda(gasto.valor)}</div>
+                          <div className="text-base font-bold text-white">{formatarMoeda(valorExibido)}</div>
                           {gasto.parcelas > 1 && (
                             <div className="text-[10px] text-slate-400">
                               {gasto.parcelas}x de {formatarMoeda(gasto.valor / gasto.parcelas)}
