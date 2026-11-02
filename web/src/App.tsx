@@ -634,22 +634,38 @@ export default function App() {
                       </p>
                       {(() => {
                         // Mostra o período da fatura selecionada para este cartão
-                        // "Fatura Novembro" fecha dia 29/out → cobre 30/set a 29/out
                         const diaFech = cartao.diaFechamento
-
-                        // Fim = diaFechamento do mês anterior ao da fatura
-                        let endMes = mesFatura - 1
-                        let endAno = anoFatura
-                        if (endMes <= 0) { endMes = 12; endAno -= 1 }
-                        const ultimoDiaFim = new Date(endAno, endMes, 0).getDate()
-                        const endDate = new Date(endAno, endMes - 1, Math.min(diaFech, ultimoDiaFim))
-
-                        // Início = dia SEGUINTE ao diaFechamento de 2 meses atrás
-                        let prevMes = mesFatura - 2
-                        let prevAno = anoFatura
-                        if (prevMes <= 0) { prevMes += 12; prevAno -= 1 }
-                        const ultimoDiaPrev = new Date(prevAno, prevMes, 0).getDate()
-                        const startDate = new Date(prevAno, prevMes - 1, Math.min(diaFech, ultimoDiaPrev))
+                        const fechamentoMesAnterior = diaFech > cartao.diaVencimento
+                        const mesFechamento = new Date(
+                          anoFatura,
+                          mesFatura - 1 - (fechamentoMesAnterior ? 1 : 0),
+                          1
+                        )
+                        const ultimoDiaFim = new Date(
+                          mesFechamento.getFullYear(),
+                          mesFechamento.getMonth() + 1,
+                          0
+                        ).getDate()
+                        const endDate = new Date(
+                          mesFechamento.getFullYear(),
+                          mesFechamento.getMonth(),
+                          Math.min(diaFech, ultimoDiaFim)
+                        )
+                        const mesFechamentoAnterior = new Date(
+                          mesFechamento.getFullYear(),
+                          mesFechamento.getMonth() - 1,
+                          1
+                        )
+                        const ultimoDiaPrev = new Date(
+                          mesFechamentoAnterior.getFullYear(),
+                          mesFechamentoAnterior.getMonth() + 1,
+                          0
+                        ).getDate()
+                        const startDate = new Date(
+                          mesFechamentoAnterior.getFullYear(),
+                          mesFechamentoAnterior.getMonth(),
+                          Math.min(diaFech, ultimoDiaPrev)
+                        )
                         startDate.setDate(startDate.getDate() + 1)
 
                         const fmt = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
