@@ -1,5 +1,3 @@
-// Prisma schema for Credit Card Expense Tracking
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -17,6 +15,7 @@ model Usuario {
   atualizadoEm  DateTime       @updatedAt
   cartoes       Cartao[]
   refreshTokens RefreshToken[]
+  boletos       BoletoRecorrente[]
 
   @@map("usuarios")
 }
@@ -65,4 +64,36 @@ model Gasto {
   atualizadoEm  DateTime @updatedAt
 
   @@map("gastos")
+}
+
+model BoletoRecorrente {
+  id              String             @id @default(uuid())
+  descricao       String
+  valorPadrao     Float
+  categoria       String             @default("Outros")
+  diaVencimento   Int
+  inicioEm        DateTime
+  ativo           Boolean            @default(true)
+  usuarioId       String
+  usuario         Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  ocorrencias     BoletoOcorrencia[]
+  criadoEm        DateTime           @default(now())
+  atualizadoEm    DateTime           @updatedAt
+
+  @@index([usuarioId, ativo, inicioEm])
+  @@map("boletos_recorrentes")
+}
+
+model BoletoOcorrencia {
+  id              String           @id @default(uuid())
+  boletoId        String
+  boleto          BoletoRecorrente @relation(fields: [boletoId], references: [id], onDelete: Cascade)
+  mes             Int
+  ano             Int
+  valor           Float
+  criadoEm        DateTime         @default(now())
+  atualizadoEm    DateTime         @updatedAt
+
+  @@unique([boletoId, ano, mes])
+  @@map("boletos_ocorrencias")
 }

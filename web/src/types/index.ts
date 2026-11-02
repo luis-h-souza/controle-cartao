@@ -47,6 +47,19 @@ export interface Gasto {
   criadoEm?: string
 }
 
+export interface BoletoRecorrente {
+  id: string
+  descricao: string
+  valorPadrao: number
+  valor: number
+  valorAjustado: boolean
+  categoria: string
+  diaVencimento: number
+  inicioEm: string
+  mes: number
+  ano: number
+}
+
 export interface CategoriaGasto {
   categoria: string
   total: number

@@ -1,4 +1,4 @@
-import type { AuthResponse, Cartao, Gasto, ResumoFinanceiro, Usuario } from '../types'
+import type { AuthResponse, BoletoRecorrente, Cartao, Gasto, ResumoFinanceiro, Usuario } from '../types'
 
 const API_BASE = '/api'
 
@@ -269,5 +269,60 @@ export const api = {
       method: 'DELETE',
     })
     if (!res.ok) throw new Error('Falha ao excluir gasto')
+  },
+
+  async getBoletos(mes: number, ano: number): Promise<BoletoRecorrente[]> {
+    const url = new URL(`${window.location.origin}${API_BASE}/boletos`)
+    url.searchParams.set('mes', String(mes))
+    url.searchParams.set('ano', String(ano))
+    const res = await fetchWithAuth(url.toString())
+    if (!res.ok) throw new Error('Falha ao buscar boletos recorrentes')
+    return res.json()
+  },
+
+  async createBoleto(data: {
+    descricao: string
+    valorPadrao: number
+    categoria: string
+    diaVencimento: number
+    inicioMes: string
+  }): Promise<BoletoRecorrente> {
+    const res = await fetchWithAuth(`${API_BASE}/boletos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Falha ao cadastrar boleto recorrente')
+    }
+    return res.json()
+  },
+
+  async updateBoletoOccurrence(
+    id: string,
+    mes: number,
+    ano: number,
+    valor: number
+  ): Promise<void> {
+    const url = new URL(`${window.location.origin}${API_BASE}/boletos/${id}/ocorrencia`)
+    url.searchParams.set('mes', String(mes))
+    url.searchParams.set('ano', String(ano))
+    const res = await fetchWithAuth(url.toString(), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ valor }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Falha ao ajustar o valor do boleto')
+    }
+  },
+
+  async deleteBoleto(id: string): Promise<void> {
+    const res = await fetchWithAuth(`${API_BASE}/boletos/${id}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error('Falha ao encerrar boleto recorrente')
   },
 }

@@ -18,12 +18,13 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  FileText,
 } from 'lucide-react'
 import { api } from './services/api'
 import { useAuth } from './contexts/AuthContext'
 import { AuthView } from './components/AuthView'
 import { EditProfileModal } from './components/EditProfileModal'
-import type { Cartao, Gasto, ResumoFinanceiro } from './types'
+import type { BoletoRecorrente, Cartao, Gasto, ResumoFinanceiro } from './types'
 
 const CATEGORIAS = [
   { nome: 'Alimentação', cor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
@@ -51,6 +52,7 @@ export default function App() {
   const { user, loading: authLoading, logout } = useAuth()
   const [cartoes, setCartoes] = useState<Cartao[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
+  const [boletos, setBoletos] = useState<BoletoRecorrente[]>([])
   const [resumo, setResumo] = useState<ResumoFinanceiro | null>(null)
   const [loading, setLoading] = useState(true)
   const [cartaoSelecionado, setCartaoSelecionado] = useState<string>('TODOS')
@@ -59,6 +61,8 @@ export default function App() {
   // Modals
   const [modalGastoAberto, setModalGastoAberto] = useState(false)
   const [modalCartaoAberto, setModalCartaoAberto] = useState(false)
+  const [modalBoletoAberto, setModalBoletoAberto] = useState(false)
+  const [boletoValorEditando, setBoletoValorEditando] = useState<BoletoRecorrente | null>(null)
   const [modalPerfilAberto, setModalPerfilAberto] = useState(false)
 
   // Form Gasto
@@ -70,6 +74,15 @@ export default function App() {
   const [parcelasGasto, setParcelasGasto] = useState('1')
   const [parcelaAtualGasto, setParcelaAtualGasto] = useState('1')
   const [recorrenteGasto, setRecorrenteGasto] = useState(false)
+  const [descricaoBoleto, setDescricaoBoleto] = useState('')
+  const [valorPadraoBoleto, setValorPadraoBoleto] = useState('')
+  const [categoriaBoleto, setCategoriaBoleto] = useState('Habitação')
+  const [diaVencimentoBoleto, setDiaVencimentoBoleto] = useState('10')
+  const [inicioMesBoleto, setInicioMesBoleto] = useState(() => {
+    const agora = new Date()
+    return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [valorBoletoEditando, setValorBoletoEditando] = useState('')
 
   // Form Cartao
   const [cartaoEditando, setCartaoEditando] = useState<Cartao | null>(null)
@@ -154,7 +167,7 @@ export default function App() {
       // Modo cartão específico: filtra pelo mês de fatura selecionado
       const isTodos = cartaoSelecionado === 'TODOS'
 
-      const [listaCartoes, listaGastos, resumoData] = await Promise.all([
+      const [listaCartoes, listaGastos, resumoData, listaBoletos] = await Promise.all([
         api.getCartoes(),
         api.getGastos({
           cartaoId: !isTodos ? cartaoSelecionado : undefined,
@@ -167,11 +180,13 @@ export default function App() {
           !isTodos ? mesFatura : undefined,
           !isTodos ? anoFatura : undefined,
         ),
+        api.getBoletos(mesFatura, anoFatura),
       ])
 
       setCartoes(listaCartoes)
       setGastos(listaGastos)
       setResumo(resumoData)
+      setBoletos(listaBoletos)
 
       if (listaCartoes.length > 0 && !cartaoGastoId) {
         setCartaoGastoId(listaCartoes[0].id)
@@ -226,6 +241,68 @@ export default function App() {
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao registrar gasto.')
+    }
+  }
+
+  const abrirNovoBoleto = () => {
+    setDescricaoBoleto('')
+    setValorPadraoBoleto('')
+    setCategoriaBoleto('Habitação')
+    setDiaVencimentoBoleto('10')
+    setInicioMesBoleto(`${anoFatura}-${String(mesFatura).padStart(2, '0')}`)
+    setModalBoletoAberto(true)
+  }
+
+  const handleCriarBoleto = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await api.createBoleto({
+        descricao: descricaoBoleto.trim(),
+        valorPadrao: Number(valorPadraoBoleto.replace(',', '.')),
+        categoria: categoriaBoleto,
+        diaVencimento: Number(diaVencimentoBoleto),
+        inicioMes: inicioMesBoleto,
+      })
+      setModalBoletoAberto(false)
+      showFeedback('sucesso', 'Boleto recorrente cadastrado!')
+      carregarDados()
+    } catch (err: any) {
+      showFeedback('erro', err.message || 'Erro ao cadastrar boleto.')
+    }
+  }
+
+  const abrirAjusteValorBoleto = (boleto: BoletoRecorrente) => {
+    setBoletoValorEditando(boleto)
+    setValorBoletoEditando(String(boleto.valor))
+  }
+
+  const handleAjustarValorBoleto = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!boletoValorEditando) return
+
+    try {
+      await api.updateBoletoOccurrence(
+        boletoValorEditando.id,
+        mesFatura,
+        anoFatura,
+        Number(valorBoletoEditando.replace(',', '.'))
+      )
+      setBoletoValorEditando(null)
+      showFeedback('sucesso', 'Valor do boleto atualizado neste mês.')
+      carregarDados()
+    } catch (err: any) {
+      showFeedback('erro', err.message || 'Erro ao ajustar o valor do boleto.')
+    }
+  }
+
+  const handleExcluirBoleto = async (boleto: BoletoRecorrente) => {
+    if (!confirm(`Deseja encerrar o boleto recorrente "${boleto.descricao}"?`)) return
+    try {
+      await api.deleteBoleto(boleto.id)
+      showFeedback('sucesso', 'Boleto recorrente encerrado.')
+      carregarDados()
+    } catch (err: any) {
+      showFeedback('erro', err.message || 'Erro ao encerrar boleto.')
     }
   }
 
@@ -325,6 +402,14 @@ export default function App() {
             >
               <CreditCard className="w-4 h-4 text-indigo-400" />
               <span><span className="sm:hidden">Cartão</span><span className="hidden sm:inline">Novo Cartão</span></span>
+            </button>
+            <button
+              onClick={abrirNovoBoleto}
+              aria-label="Novo boleto recorrente"
+              className="px-1.5 sm:px-3.5 py-2 text-[11px] sm:text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 transition-all flex items-center gap-1 sm:gap-2 cursor-pointer shadow-sm whitespace-nowrap [&>svg]:hidden sm:[&>svg]:block"
+            >
+              <FileText className="w-4 h-4 text-emerald-400" />
+              <span><span className="sm:hidden">Boleto</span><span className="hidden sm:inline">Novo Boleto</span></span>
             </button>
             <button
               onClick={() => {
@@ -707,6 +792,88 @@ export default function App() {
           )}
         </section>
 
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                Boletos recorrentes
+              </h2>
+              <p className="text-xs text-slate-400">
+                {MESES[mesFatura - 1]}/{anoFatura} • Total: {formatarMoeda(boletos.reduce((total, boleto) => total + boleto.valor, 0))}
+              </p>
+            </div>
+            <button
+              onClick={abrirNovoBoleto}
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Cadastrar boleto mensal
+            </button>
+          </div>
+
+          {boletos.length === 0 ? (
+            <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl p-6 text-center">
+              <p className="text-sm text-slate-300">Nenhum boleto recorrente neste mês.</p>
+              <p className="text-xs text-slate-500 mt-1">Cadastre uma vez para ele aparecer nos meses seguintes.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {boletos.map((boleto) => {
+                const catConfig =
+                  CATEGORIAS.find((categoria) => categoria.nome === boleto.categoria) ||
+                  CATEGORIAS[CATEGORIAS.length - 1]
+                const ultimoDiaDoMes = new Date(anoFatura, mesFatura, 0).getDate()
+                const diaVencimento = Math.min(boleto.diaVencimento, ultimoDiaDoMes)
+
+                return (
+                  <div
+                    key={boleto.id}
+                    className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-white truncate">{boleto.descricao}</h3>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] border font-medium ${catConfig.cor}`}>
+                            {boleto.categoria}
+                          </span>
+                          <span>Vence dia {diaVencimento}</span>
+                          {boleto.valorAjustado && <span className="text-amber-400">Valor ajustado neste mês</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pl-[52px] sm:pl-0">
+                      <span className="text-base font-bold text-white">{formatarMoeda(boleto.valor)}</span>
+                      <button
+                        type="button"
+                        onClick={() => abrirAjusteValorBoleto(boleto)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"
+                        title="Ajustar valor somente neste mês"
+                        aria-label={`Ajustar valor de ${boleto.descricao} neste mês`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExcluirBoleto(boleto)}
+                        className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        title="Encerrar boleto recorrente"
+                        aria-label={`Encerrar ${boleto.descricao}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Expenses List & Category Breakdown Section */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Expenses List (2 Cols) */}
@@ -1044,6 +1211,167 @@ export default function App() {
                   className="px-5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all"
                 >
                   Salvar Compra
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modalBoletoAberto && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="my-0 sm:my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                Cadastrar boleto recorrente
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalBoletoAberto(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCriarBoleto} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Descrição *</label>
+                <input
+                  type="text"
+                  required
+                  value={descricaoBoleto}
+                  onChange={(e) => setDescricaoBoleto(e.target.value)}
+                  placeholder="Ex.: Cobertura do apartamento"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Valor padrão (R$) *</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={valorPadraoBoleto}
+                    onChange={(e) => setValorPadraoBoleto(e.target.value)}
+                    placeholder="0,00"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Vencimento (dia) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    required
+                    value={diaVencimentoBoleto}
+                    onChange={(e) => setDiaVencimentoBoleto(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Categoria</label>
+                  <select
+                    value={categoriaBoleto}
+                    onChange={(e) => setCategoriaBoleto(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {CATEGORIAS.map((categoria) => (
+                      <option key={categoria.nome} value={categoria.nome}>
+                        {categoria.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Começa em</label>
+                  <input
+                    type="month"
+                    required
+                    value={inicioMesBoleto}
+                    onChange={(e) => setInicioMesBoleto(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                O boleto aparecerá todo mês a partir da data inicial. O valor padrão será usado nos meses futuros;
+                ajustes feitos em um mês não alteram os demais.
+              </p>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalBoletoAberto(false)}
+                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-all"
+                >
+                  Salvar boleto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {boletoValorEditando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white">Ajustar valor deste mês</h3>
+              <button
+                type="button"
+                onClick={() => setBoletoValorEditando(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              {boletoValorEditando.descricao} • {MESES[mesFatura - 1]}/{anoFatura}
+            </p>
+            <form onSubmit={handleAjustarValorBoleto} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Valor do mês (R$)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={valorBoletoEditando}
+                  onChange={(e) => setValorBoletoEditando(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setBoletoValorEditando(null)}
+                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white"
+                >
+                  Salvar valor
                 </button>
               </div>
             </form>
