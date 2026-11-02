@@ -71,13 +71,64 @@ const CORES_GRAFICO = [
   '#94a3b8',
 ]
 
+function GastosPorVencimentoCard({
+  mes,
+  total,
+  ateDia15,
+  dia16EmDiante,
+}: {
+  mes: string
+  total: number
+  ateDia15: number
+  dia16EmDiante: number
+}) {
+  const percentualAteDia15 = total > 0 ? (ateDia15 / total) * 100 : 0
+  const percentualDia16EmDiante = total > 0 ? (dia16EmDiante / total) * 100 : 0
+  const formatarValor = (valor: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+
+  return (
+    <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
+      <div className="flex items-center justify-between text-slate-400 mb-3">
+        <span className="text-xs font-medium uppercase tracking-wider">Gastos por vencimento</span>
+        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-300 flex items-center justify-center">
+          <CalendarDays className="w-4 h-4" />
+        </div>
+      </div>
+      <p className="text-[10px] text-slate-500 mb-3">{mes} • cartões e boletos</p>
+      <div className="space-y-3">
+        <div>
+          <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
+            <span className="text-cyan-300">Até dia 15</span>
+            <span className="text-white font-semibold">{formatarValor(ateDia15)}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-full rounded-full bg-cyan-400" style={{ width: `${percentualAteDia15}%` }} />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
+            <span className="text-violet-300">Dia 16 em diante</span>
+            <span className="text-white font-semibold">{formatarValor(dia16EmDiante)}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-violet-400"
+              style={{ width: `${percentualDia16EmDiante}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const { user, loading: authLoading, logout } = useAuth()
   const [cartoes, setCartoes] = useState<Cartao[]>([])
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [boletos, setBoletos] = useState<BoletoRecorrente[]>([])
   const [resumo, setResumo] = useState<ResumoFinanceiro | null>(null)
-  const [loading, setLoading] = useState(true)
   const [loadingAnalise, setLoadingAnalise] = useState(false)
   const [analise, setAnalise] = useState<AnaliseFinanceira | null>(null)
   const [telaAtiva, setTelaAtiva] = useState<'painel' | 'analises'>('painel')
@@ -210,8 +261,6 @@ export default function App() {
 
   const carregarDados = async () => {
     try {
-      setLoading(true)
-
       // Modo TODOS: busca as últimas compras sem filtro de mês (serão limitadas a 10 no display)
       // Modo cartão específico: filtra pelo mês de fatura selecionado
       const isTodos = cartaoSelecionado === 'TODOS'
@@ -245,8 +294,6 @@ export default function App() {
     } catch (err: any) {
       console.error(err)
       showFeedback('erro', err.message || 'Erro ao carregar dados.')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -496,11 +543,6 @@ export default function App() {
               <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
                 Controle de Cartões
               </h1>
-              <p className="hidden sm:flex text-xs text-slate-400 items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Neon Lakebase Postgres conectado
-                {loading && <RefreshCw className="w-3 h-3 text-slate-500 animate-spin ml-1" />}
-              </p>
             </div>
           </div>
 
@@ -821,7 +863,7 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
                     <div className="text-xs uppercase tracking-wider text-slate-400">Total no mês</div>
                     <div className="text-2xl font-bold text-white mt-2">
@@ -864,6 +906,12 @@ export default function App() {
                         : 'Sem dados do mês anterior'}
                     </div>
                   </div>
+                  <GastosPorVencimentoCard
+                    mes={`${MESES[mesFatura - 1]} ${anoFatura}`}
+                    total={analiseAtual?.total || 0}
+                    ateDia15={analiseAtual?.totalVencimentoAteDia15 || 0}
+                    dia16EmDiante={analiseAtual?.totalVencimentoDia16EmDiante || 0}
+                  />
                 </div>
 
                 <p className="text-xs text-slate-500">
@@ -1052,7 +1100,7 @@ export default function App() {
         ) : (
           <>
         {/* Financial KPI Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Fatura {MESES[mesFatura - 1]}</span>
@@ -1133,55 +1181,12 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
-            <div className="flex items-center justify-between text-slate-400 mb-3">
-              <span className="text-xs font-medium uppercase tracking-wider">Gastos por vencimento</span>
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-300 flex items-center justify-center">
-                <CalendarDays className="w-4 h-4" />
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-500 mb-3">
-              {MESES[mesFatura - 1]} • cartões e boletos
-            </p>
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
-                  <span className="text-cyan-300">Até dia 15</span>
-                  <span className="text-white font-semibold">
-                    {formatarMoeda(analiseAtual?.totalVencimentoAteDia15 || 0)}
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-cyan-400"
-                    style={{
-                      width: `${analiseAtual?.total
-                        ? (analiseAtual.totalVencimentoAteDia15 / analiseAtual.total) * 100
-                        : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
-                  <span className="text-violet-300">Dia 16 em diante</span>
-                  <span className="text-white font-semibold">
-                    {formatarMoeda(analiseAtual?.totalVencimentoDia16EmDiante || 0)}
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-violet-400"
-                    style={{
-                      width: `${analiseAtual?.total
-                        ? (analiseAtual.totalVencimentoDia16EmDiante / analiseAtual.total) * 100
-                        : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <GastosPorVencimentoCard
+            mes={`${MESES[mesFatura - 1]} ${anoFatura}`}
+            total={analiseAtual?.total || 0}
+            ateDia15={analiseAtual?.totalVencimentoAteDia15 || 0}
+            dia16EmDiante={analiseAtual?.totalVencimentoDia16EmDiante || 0}
+          />
         </section>
 
         {/* Cards Carousel / Section */}

@@ -7,7 +7,6 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  Zap,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
@@ -177,30 +176,23 @@ export function AuthView() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
-            >
-              {loading ? (
-                <span>Processando...</span>
-              ) : (
-                <>
-                  <span>{modo === 'login' ? 'Entrar no Sistema' : 'Criar Minha Conta'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            <div className="border-t border-slate-800/80 pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+              >
+                {loading ? (
+                  <span>Processando...</span>
+                ) : (
+                  <>
+                    <span>{modo === 'login' ? 'Entrar no Sistema' : 'Criar Minha Conta'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
           </form>
-
-          {/* Security details footnote */}
-          <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              Sessão persistente
-            </span>
-            <span>Criptografia bcrypt + JWT</span>
-          </div>
         </div>
       </div>
     </div>
