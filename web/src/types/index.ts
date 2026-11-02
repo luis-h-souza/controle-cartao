@@ -66,6 +66,8 @@ export interface AnaliseMensal {
   total: number
   totalCartoes: number
   totalBoletos: number
+  totalVencimentoAteDia15: number
+  totalVencimentoDia16EmDiante: number
   porCategoria: Array<{ nome: string; total: number }>
   porCartao: Array<{ id: string; nome: string; cor: string | null; total: number }>
 }

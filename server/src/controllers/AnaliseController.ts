@@ -68,6 +68,8 @@ export class AnaliseController {
         const cartoesTotais = new Map<string, { nome: string; cor: string | null; total: number }>()
         let totalCartoes = 0
         let totalBoletos = 0
+        let totalVencimentoAteDia15 = 0
+        let totalVencimentoDia16EmDiante = 0
 
         for (const gasto of gastos) {
           const parcela = parcelaNaFatura(gasto, periodo.mes, periodo.ano)
@@ -75,6 +77,11 @@ export class AnaliseController {
 
           const valor = gasto.parcelas > 1 ? gasto.valor / gasto.parcelas : gasto.valor
           totalCartoes += valor
+          if (gasto.cartao.diaVencimento <= 15) {
+            totalVencimentoAteDia15 += valor
+          } else {
+            totalVencimentoDia16EmDiante += valor
+          }
           adicionarTotal(porCategoria, gasto.categoria, valor)
           const cartaoAtual = cartoesTotais.get(gasto.cartao.id) || {
             nome: gasto.cartao.nome,
@@ -100,6 +107,11 @@ export class AnaliseController {
           )
           const valor = ocorrencia?.valor ?? boleto.valorPadrao
           totalBoletos += valor
+          if (boleto.diaVencimento <= 15) {
+            totalVencimentoAteDia15 += valor
+          } else {
+            totalVencimentoDia16EmDiante += valor
+          }
           adicionarTotal(porCategoria, boleto.categoria, valor)
         }
 
@@ -116,6 +128,8 @@ export class AnaliseController {
           total: totalCartoes + totalBoletos,
           totalCartoes,
           totalBoletos,
+          totalVencimentoAteDia15,
+          totalVencimentoDia16EmDiante,
           porCategoria: porCategoriaOrdenado,
           porCartao,
         }

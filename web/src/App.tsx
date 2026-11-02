@@ -216,7 +216,7 @@ export default function App() {
       // Modo cartão específico: filtra pelo mês de fatura selecionado
       const isTodos = cartaoSelecionado === 'TODOS'
 
-      const [listaCartoes, listaGastos, resumoData, listaBoletos] = await Promise.all([
+      const [listaCartoes, listaGastos, resumoData, listaBoletos, analiseData] = await Promise.all([
         api.getCartoes(),
         api.getGastos({
           cartaoId: !isTodos ? cartaoSelecionado : undefined,
@@ -230,12 +230,14 @@ export default function App() {
           !isTodos ? anoFatura : undefined,
         ),
         api.getBoletos(mesFatura, anoFatura),
+        api.getAnalise(mesFatura, anoFatura),
       ])
 
       setCartoes(listaCartoes)
       setGastos(listaGastos)
       setResumo(resumoData)
       setBoletos(listaBoletos)
+      setAnalise(analiseData)
 
       if (listaCartoes.length > 0 && !cartaoGastoId) {
         setCartaoGastoId(listaCartoes[0].id)
@@ -992,21 +994,48 @@ export default function App() {
                   <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6">
                     <div className="mb-5">
                       <h2 className="text-base font-bold text-white">Comparativo do período</h2>
-                      <p className="text-xs text-slate-400 mt-1">Cartões e boletos, mês a mês</p>
+                      <p className="text-xs text-slate-400 mt-1">Gastos agrupados pelo dia de vencimento</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
+                        <span className="inline-flex items-center gap-2 text-[11px] text-slate-400">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-cyan-400" />
+                          Vencimento até dia 15
+                        </span>
+                        <span className="inline-flex items-center gap-2 text-[11px] text-slate-400">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-violet-400" />
+                          Vencimento do dia 16 em diante
+                        </span>
+                      </div>
                     </div>
                     <div className="space-y-3">
                       {mesesAnalise.map((item, index) => {
                         const percentual = maiorGastoMensal > 0 ? (item.total / maiorGastoMensal) * 100 : 0
+                        const percentualAteDia15 =
+                          item.total > 0 ? (item.totalVencimentoAteDia15 / item.total) * 100 : 0
+                        const percentualDia16EmDiante =
+                          item.total > 0 ? (item.totalVencimentoDia16EmDiante / item.total) * 100 : 0
                         return (
                           <div key={`${item.ano}-${item.mes}`} className="grid grid-cols-[52px_1fr_auto] items-center gap-3">
                             <span className={`text-xs ${index === mesesAnalise.length - 1 ? 'text-white font-semibold' : 'text-slate-400'}`}>
                               {MESES[item.mes - 1].slice(0, 3)}/{String(item.ano).slice(-2)}
                             </span>
-                            <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-2 rounded-full bg-slate-800 overflow-hidden"
+                              title={`${MESES[item.mes - 1]} ${item.ano}: até dia 15 ${formatarMoeda(item.totalVencimentoAteDia15)}; do dia 16 em diante ${formatarMoeda(item.totalVencimentoDia16EmDiante)}`}
+                              aria-label={`${MESES[item.mes - 1]} ${item.ano}: vencimentos até dia 15 ${formatarMoeda(item.totalVencimentoAteDia15)}, vencimentos do dia 16 em diante ${formatarMoeda(item.totalVencimentoDia16EmDiante)}`}
+                            >
                               <div
-                                className={`h-full rounded-full ${index === mesesAnalise.length - 1 ? 'bg-indigo-400' : 'bg-slate-500'}`}
+                                className="h-full flex rounded-full overflow-hidden"
                                 style={{ width: `${percentual}%` }}
-                              />
+                              >
+                                <span
+                                  className="h-full bg-cyan-400"
+                                  style={{ width: `${percentualAteDia15}%` }}
+                                />
+                                <span
+                                  className="h-full bg-violet-400"
+                                  style={{ width: `${percentualDia16EmDiante}%` }}
+                                />
+                              </div>
                             </div>
                             <span className="text-xs text-slate-300 text-right min-w-[92px]">
                               {formatarMoeda(item.total)}
@@ -1023,7 +1052,7 @@ export default function App() {
         ) : (
           <>
         {/* Financial KPI Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Fatura {MESES[mesFatura - 1]}</span>
@@ -1101,6 +1130,56 @@ export default function App() {
             </div>
             <div className="text-xs text-slate-400 mt-2">
               {boletos.length} {boletos.length === 1 ? 'boleto previsto' : 'boletos previstos'}
+            </div>
+          </div>
+
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
+            <div className="flex items-center justify-between text-slate-400 mb-3">
+              <span className="text-xs font-medium uppercase tracking-wider">Gastos por vencimento</span>
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-300 flex items-center justify-center">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 mb-3">
+              {MESES[mesFatura - 1]} • cartões e boletos
+            </p>
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
+                  <span className="text-cyan-300">Até dia 15</span>
+                  <span className="text-white font-semibold">
+                    {formatarMoeda(analiseAtual?.totalVencimentoAteDia15 || 0)}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-cyan-400"
+                    style={{
+                      width: `${analiseAtual?.total
+                        ? (analiseAtual.totalVencimentoAteDia15 / analiseAtual.total) * 100
+                        : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between gap-2 text-[11px] mb-1">
+                  <span className="text-violet-300">Dia 16 em diante</span>
+                  <span className="text-white font-semibold">
+                    {formatarMoeda(analiseAtual?.totalVencimentoDia16EmDiante || 0)}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-violet-400"
+                    style={{
+                      width: `${analiseAtual?.total
+                        ? (analiseAtual.totalVencimentoDia16EmDiante / analiseAtual.total) * 100
+                        : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>
