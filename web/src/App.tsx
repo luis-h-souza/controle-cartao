@@ -1100,7 +1100,7 @@ export default function App() {
         ) : (
           <>
         {/* Financial KPI Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Fatura {MESES[mesFatura - 1]}</span>
@@ -1778,7 +1778,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setModalGastoAberto(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1889,7 +1889,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setModalBoletoAberto(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1939,7 +1939,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setBoletoValorEditando(null)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
                 >
                   Cancelar
                 </button>
@@ -2062,7 +2062,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setModalCartaoAberto(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
                 >
                   Cancelar
                 </button>
