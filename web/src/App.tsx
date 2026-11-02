@@ -33,6 +33,8 @@ const CATEGORIAS = [
   { nome: 'Assinaturas', cor: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
   { nome: 'Educação', cor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
   { nome: 'Compras', cor: 'bg-pink-500/10 text-pink-400 border-pink-500/20' },
+  { nome: 'Habitação', cor: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+  { nome: 'Cachorros', cor: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
   { nome: 'Outros', cor: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
 ]
 
@@ -770,7 +772,7 @@ export default function App() {
             ) : (
               <div className="space-y-2.5">
                 {(cartaoSelecionado === 'TODOS' ? gastos.slice(0, 10) : gastos).map((gasto) => {
-                  const catConfig = CATEGORIAS.find((c) => c.nome === gasto.categoria) || CATEGORIAS[7]
+                  const catConfig = CATEGORIAS.find((c) => c.nome === gasto.categoria) || CATEGORIAS[CATEGORIAS.length - 1]
                   const valorExibido =
                     cartaoSelecionado !== 'TODOS' && gasto.parcelas > 1
                       ? gasto.valor / gasto.parcelas
@@ -871,7 +873,7 @@ export default function App() {
                 </div>
               ) : (
                 resumo.porCategoria.map((item) => {
-                  const catConfig = CATEGORIAS.find((c) => c.nome === item.categoria) || CATEGORIAS[7]
+                  const catConfig = CATEGORIAS.find((c) => c.nome === item.categoria) || CATEGORIAS[CATEGORIAS.length - 1]
                   return (
                     <div key={item.categoria} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
