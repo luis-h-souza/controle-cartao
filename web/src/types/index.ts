@@ -60,6 +60,20 @@ export interface BoletoRecorrente {
   ano: number
 }
 
+export interface AnaliseMensal {
+  mes: number
+  ano: number
+  total: number
+  totalCartoes: number
+  totalBoletos: number
+  porCategoria: Array<{ nome: string; total: number }>
+  porCartao: Array<{ id: string; nome: string; cor: string | null; total: number }>
+}
+
+export interface AnaliseFinanceira {
+  meses: AnaliseMensal[]
+}
+
 export interface CategoriaGasto {
   categoria: string
   total: number

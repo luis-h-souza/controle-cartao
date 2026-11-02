@@ -1,6 +1,7 @@
 import fastify from 'fastify'
 import cors from '@fastify/cors'
 import { authRoutes } from './routes/authRoutes.js'
+import { analiseRoutes } from './routes/analiseRoutes.js'
 import { boletoRoutes } from './routes/boletoRoutes.js'
 import { cartaoRoutes } from './routes/cartaoRoutes.js'
 import { gastoRoutes } from './routes/gastoRoutes.js'
@@ -22,6 +23,7 @@ export function buildApp() {
 
   // Register API Routes
   app.register(authRoutes, { prefix: '/api/auth' })
+  app.register(analiseRoutes, { prefix: '/api/analises' })
   app.register(boletoRoutes, { prefix: '/api/boletos' })
   app.register(cartaoRoutes, { prefix: '/api/cartoes' })
   app.register(gastoRoutes, { prefix: '/api/gastos' })

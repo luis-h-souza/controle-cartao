@@ -19,12 +19,19 @@ import {
   ChevronRight,
   CalendarDays,
   FileText,
+  BarChart3,
 } from 'lucide-react'
 import { api } from './services/api'
 import { useAuth } from './contexts/AuthContext'
 import { AuthView } from './components/AuthView'
 import { EditProfileModal } from './components/EditProfileModal'
-import type { BoletoRecorrente, Cartao, Gasto, ResumoFinanceiro } from './types'
+import type {
+  AnaliseFinanceira,
+  BoletoRecorrente,
+  Cartao,
+  Gasto,
+  ResumoFinanceiro,
+} from './types'
 
 const CATEGORIAS = [
   { nome: 'Alimentação', cor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
@@ -48,6 +55,19 @@ const CORES_CARTAO = [
   { nome: 'Dourado Gold', valor: '#d97706' },
 ]
 
+const CORES_GRAFICO = [
+  '#34d399',
+  '#60a5fa',
+  '#a78bfa',
+  '#fb7185',
+  '#fbbf24',
+  '#22d3ee',
+  '#f472b6',
+  '#fb923c',
+  '#facc15',
+  '#94a3b8',
+]
+
 export default function App() {
   const { user, loading: authLoading, logout } = useAuth()
   const [cartoes, setCartoes] = useState<Cartao[]>([])
@@ -55,6 +75,10 @@ export default function App() {
   const [boletos, setBoletos] = useState<BoletoRecorrente[]>([])
   const [resumo, setResumo] = useState<ResumoFinanceiro | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingAnalise, setLoadingAnalise] = useState(false)
+  const [analise, setAnalise] = useState<AnaliseFinanceira | null>(null)
+  const [telaAtiva, setTelaAtiva] = useState<'painel' | 'analises'>('painel')
+  const [versaoAnalise, setVersaoAnalise] = useState(0)
   const [cartaoSelecionado, setCartaoSelecionado] = useState<string>('TODOS')
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('TODAS')
 
@@ -97,6 +121,7 @@ export default function App() {
   const hoje = new Date()
   const [mesFatura, setMesFatura] = useState(hoje.getMonth() + 1)   // 1-12
   const [anoFatura, setAnoFatura] = useState(hoje.getFullYear())
+  const [erroAnalise, setErroAnalise] = useState('')
 
   const [feedbackMsg, setFeedbackMsg] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null)
 
@@ -105,12 +130,22 @@ export default function App() {
     setTimeout(() => setFeedbackMsg(null), 4000)
   }
 
+  const atualizarAnalise = () => {
+    setLoadingAnalise(true)
+    setErroAnalise('')
+    setVersaoAnalise((versao) => versao + 1)
+  }
+
   const MESES = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
   ]
 
   const irParaMesAnterior = () => {
+    if (telaAtiva === 'analises') {
+      setLoadingAnalise(true)
+      setErroAnalise('')
+    }
     if (mesFatura === 1) {
       setMesFatura(12)
       setAnoFatura((a) => a - 1)
@@ -120,6 +155,10 @@ export default function App() {
   }
 
   const irParaProximoMes = () => {
+    if (telaAtiva === 'analises') {
+      setLoadingAnalise(true)
+      setErroAnalise('')
+    }
     if (mesFatura === 12) {
       setMesFatura(1)
       setAnoFatura((a) => a + 1)
@@ -129,6 +168,10 @@ export default function App() {
   }
 
   const irParaMesAtual = () => {
+    if (telaAtiva === 'analises') {
+      setLoadingAnalise(true)
+      setErroAnalise('')
+    }
     const agora = new Date()
     setMesFatura(agora.getMonth() + 1)
     setAnoFatura(agora.getFullYear())
@@ -205,6 +248,29 @@ export default function App() {
     }
   }, [user, cartaoSelecionado, categoriaFiltro, mesFatura, anoFatura])
 
+  useEffect(() => {
+    if (!user || telaAtiva !== 'analises') return
+
+    let ativa = true
+    api.getAnalise(mesFatura, anoFatura)
+      .then((dados) => {
+        if (ativa) setAnalise(dados)
+      })
+      .catch((err: unknown) => {
+        if (!ativa) return
+        console.error(err)
+        setErroAnalise(err instanceof Error ? err.message : 'Erro ao carregar as análises.')
+        showFeedback('erro', err instanceof Error ? err.message : 'Erro ao carregar as análises.')
+      })
+      .finally(() => {
+        if (ativa) setLoadingAnalise(false)
+      })
+
+    return () => {
+      ativa = false
+    }
+  }, [user, telaAtiva, mesFatura, anoFatura, versaoAnalise])
+
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -238,6 +304,7 @@ export default function App() {
       setParcelasGasto('1')
       setParcelaAtualGasto('1')
       setRecorrenteGasto(false)
+      atualizarAnalise()
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao registrar gasto.')
@@ -265,6 +332,7 @@ export default function App() {
       })
       setModalBoletoAberto(false)
       showFeedback('sucesso', 'Boleto recorrente cadastrado!')
+      atualizarAnalise()
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao cadastrar boleto.')
@@ -289,6 +357,7 @@ export default function App() {
       )
       setBoletoValorEditando(null)
       showFeedback('sucesso', 'Valor do boleto atualizado neste mês.')
+      atualizarAnalise()
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao ajustar o valor do boleto.')
@@ -300,6 +369,7 @@ export default function App() {
     try {
       await api.deleteBoleto(boleto.id)
       showFeedback('sucesso', 'Boleto recorrente encerrado.')
+      atualizarAnalise()
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao encerrar boleto.')
@@ -331,6 +401,7 @@ export default function App() {
       setNomeCartao('')
       setLimiteCartao('')
       if (!cartaoEditando) setCartaoGastoId(cartaoSalvo.id)
+      atualizarAnalise()
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao criar cartão.')
@@ -342,6 +413,7 @@ export default function App() {
     try {
       await api.deleteGasto(id)
       showFeedback('sucesso', 'Gasto removido!')
+      atualizarAnalise()
       carregarDados()
     } catch (err: any) {
       showFeedback('erro', err.message || 'Erro ao excluir gasto.')
@@ -353,6 +425,7 @@ export default function App() {
     try {
       await api.deleteCartao(id)
       showFeedback('sucesso', 'Cartão removido!')
+      atualizarAnalise()
       if (cartaoSelecionado === id) setCartaoSelecionado('TODOS')
       carregarDados()
     } catch (err: any) {
@@ -372,6 +445,15 @@ export default function App() {
   if (!user) {
     return <AuthView />
   }
+
+  const mesesAnalise = analise?.meses || []
+  const analiseAtual = mesesAnalise[mesesAnalise.length - 1]
+  const analiseAnterior = mesesAnalise[mesesAnalise.length - 2]
+  const maiorGastoMensal = Math.max(1, ...mesesAnalise.map((item) => item.total))
+  const variacaoMensal =
+    analiseAtual && analiseAnterior && analiseAnterior.total > 0
+      ? ((analiseAtual.total - analiseAnterior.total) / analiseAnterior.total) * 100
+      : null
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
@@ -492,12 +574,49 @@ export default function App() {
           </div>
         )}
 
+        <nav
+          aria-label="Navegação principal"
+          className="flex items-center gap-2 border-b border-slate-800"
+        >
+          <button
+            type="button"
+            onClick={() => setTelaAtiva('painel')}
+            aria-current={telaAtiva === 'painel' ? 'page' : undefined}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              telaAtiva === 'painel'
+                ? 'border-indigo-400 text-white'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            Visão geral
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLoadingAnalise(true)
+              setErroAnalise('')
+              setTelaAtiva('analises')
+            }}
+            aria-current={telaAtiva === 'analises' ? 'page' : undefined}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors inline-flex items-center gap-2 ${
+              telaAtiva === 'analises'
+                ? 'border-indigo-400 text-white'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Análises
+          </button>
+        </nav>
+
         {/* Seletor de Mês de Fatura */}
         <section className="bg-slate-900/60 border border-slate-800 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-slate-400">
             <CalendarDays className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span className="text-xs font-medium uppercase tracking-wider">Fatura de referência</span>
-            {cartaoSelecionado !== 'TODOS' && (() => {
+            <span className="text-xs font-medium uppercase tracking-wider">
+              {telaAtiva === 'analises' ? 'Mês de referência' : 'Fatura de referência'}
+            </span>
+            {telaAtiva === 'painel' && cartaoSelecionado !== 'TODOS' && (() => {
               const cartao = cartoes.find(c => c.id === cartaoSelecionado)
               return cartao ? (
                 <span className="text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full">
@@ -547,6 +666,229 @@ export default function App() {
           </div>
         </section>
 
+        {telaAtiva === 'analises' ? (
+          <section className="space-y-6">
+            {erroAnalise ? (
+              <div className="bg-rose-950/40 border border-rose-500/30 rounded-2xl p-6 text-center space-y-3">
+                <p className="text-sm text-rose-200">{erroAnalise}</p>
+                <button
+                  type="button"
+                  onClick={atualizarAnalise}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : loadingAnalise && !analise ? (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 flex items-center justify-center gap-3 text-slate-400">
+                <RefreshCw className="w-5 h-5 animate-spin text-indigo-400" />
+                <span className="text-sm">Carregando análises...</span>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Total no mês</div>
+                    <div className="text-2xl font-bold text-white mt-2">
+                      {formatarMoeda(analiseAtual?.total || 0)}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">
+                      {MESES[mesFatura - 1]} {anoFatura} • cartões e boletos
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Cartões de crédito</div>
+                    <div className="text-2xl font-bold text-indigo-300 mt-2">
+                      {formatarMoeda(analiseAtual?.totalCartoes || 0)}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">Parcelas e compras da fatura</div>
+                  </div>
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Boletos recorrentes</div>
+                    <div className="text-2xl font-bold text-emerald-300 mt-2">
+                      {formatarMoeda(analiseAtual?.totalBoletos || 0)}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">Valores previstos para o mês</div>
+                  </div>
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <div className="text-xs uppercase tracking-wider text-slate-400">Variação vs. mês anterior</div>
+                    <div className={`text-2xl font-bold mt-2 ${
+                      variacaoMensal === null
+                        ? 'text-slate-300'
+                        : variacaoMensal > 0
+                          ? 'text-rose-300'
+                          : 'text-emerald-300'
+                    }`}>
+                      {variacaoMensal === null
+                        ? '—'
+                        : `${variacaoMensal > 0 ? '+' : ''}${variacaoMensal.toFixed(1)}%`}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">
+                      {analiseAnterior
+                        ? `${MESES[analiseAnterior.mes - 1]}: ${formatarMoeda(analiseAnterior.total)}`
+                        : 'Sem dados do mês anterior'}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  A análise considera as compras registradas nos cartões, parcelas previstas para cada fatura e boletos recorrentes cadastrados.
+                  Despesas que não foram registradas no app não entram nesses totais.
+                </p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6">
+                    <div className="mb-6">
+                      <h2 className="text-base font-bold text-white">Evolução mensal</h2>
+                      <p className="text-xs text-slate-400 mt-1">Total de gastos nos últimos seis meses</p>
+                    </div>
+                    {mesesAnalise.every((item) => item.total === 0) ? (
+                      <p className="text-sm text-slate-500 py-12 text-center">Ainda não há gastos para comparar.</p>
+                    ) : (
+                      <div className="h-52 flex items-end justify-around gap-2 sm:gap-4 border-b border-slate-700 pb-2">
+                        {mesesAnalise.map((item, index) => {
+                          const altura = item.total > 0 ? Math.max(8, (item.total / maiorGastoMensal) * 100) : 0
+                          const selecionado = index === mesesAnalise.length - 1
+                          return (
+                            <div
+                              key={`${item.ano}-${item.mes}`}
+                              className="flex-1 h-full flex flex-col items-center justify-end gap-2 min-w-0"
+                              title={`${MESES[item.mes - 1]} ${item.ano}: ${formatarMoeda(item.total)}`}
+                            >
+                              <span className="text-[10px] sm:text-xs text-slate-400 truncate max-w-full">
+                                {item.total > 0 ? formatarMoeda(item.total) : '—'}
+                              </span>
+                              <div className="h-32 w-full flex items-end justify-center">
+                                <div
+                                  className={`w-full max-w-12 rounded-t-md transition-all ${
+                                    selecionado ? 'bg-indigo-400' : 'bg-indigo-500/50'
+                                  }`}
+                                  style={{ height: `${altura}%` }}
+                                />
+                              </div>
+                              <span className={`text-[10px] sm:text-xs ${selecionado ? 'text-white font-semibold' : 'text-slate-500'}`}>
+                                {MESES[item.mes - 1].slice(0, 3)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6">
+                    <div className="mb-5">
+                      <h2 className="text-base font-bold text-white">Gastos por categoria</h2>
+                      <p className="text-xs text-slate-400 mt-1">Fatura do cartão e boletos do mês selecionado</p>
+                    </div>
+                    {!analiseAtual?.porCategoria.length ? (
+                      <p className="text-sm text-slate-500 py-12 text-center">Nenhuma despesa neste mês.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {analiseAtual.porCategoria.map((item) => {
+                          const indiceCategoria = CATEGORIAS.findIndex((categoria) => categoria.nome === item.nome)
+                          const corCategoria = CORES_GRAFICO[indiceCategoria] || CORES_GRAFICO[CORES_GRAFICO.length - 1]
+                          const percentual = analiseAtual.total > 0 ? (item.total / analiseAtual.total) * 100 : 0
+                          return (
+                            <div key={item.nome} className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-3 text-xs">
+                                <span className="text-slate-200">{item.nome}</span>
+                                <span className="text-right text-slate-300">
+                                  {formatarMoeda(item.total)} <span className="text-slate-500">({percentual.toFixed(1)}%)</span>
+                                </span>
+                              </div>
+                              <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${percentual}%`, backgroundColor: corCategoria }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6">
+                    <div className="mb-5">
+                      <h2 className="text-base font-bold text-white">Gastos por cartão</h2>
+                      <p className="text-xs text-slate-400 mt-1">Participação de cada cartão no mês</p>
+                    </div>
+                    {!analiseAtual?.porCartao.length ? (
+                      <p className="text-sm text-slate-500 py-8 text-center">Nenhum gasto em cartão neste mês.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {analiseAtual.porCartao.map((item) => {
+                          const percentual =
+                            analiseAtual.totalCartoes > 0
+                              ? (item.total / analiseAtual.totalCartoes) * 100
+                              : 0
+                          return (
+                            <div key={item.id} className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-3 text-xs">
+                                <span className="flex items-center gap-2 text-slate-200 min-w-0">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: item.cor || '#818cf8' }}
+                                  />
+                                  <span className="truncate">{item.nome}</span>
+                                </span>
+                                <span className="text-right text-slate-300">
+                                  {formatarMoeda(item.total)} <span className="text-slate-500">({percentual.toFixed(1)}%)</span>
+                                </span>
+                              </div>
+                              <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${Math.min(100, percentual)}%`,
+                                    backgroundColor: item.cor || '#818cf8',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6">
+                    <div className="mb-5">
+                      <h2 className="text-base font-bold text-white">Comparativo do período</h2>
+                      <p className="text-xs text-slate-400 mt-1">Cartões e boletos, mês a mês</p>
+                    </div>
+                    <div className="space-y-3">
+                      {mesesAnalise.map((item, index) => {
+                        const percentual = maiorGastoMensal > 0 ? (item.total / maiorGastoMensal) * 100 : 0
+                        return (
+                          <div key={`${item.ano}-${item.mes}`} className="grid grid-cols-[52px_1fr_auto] items-center gap-3">
+                            <span className={`text-xs ${index === mesesAnalise.length - 1 ? 'text-white font-semibold' : 'text-slate-400'}`}>
+                              {MESES[item.mes - 1].slice(0, 3)}/{String(item.ano).slice(-2)}
+                            </span>
+                            <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${index === mesesAnalise.length - 1 ? 'bg-indigo-400' : 'bg-slate-500'}`}
+                                style={{ width: `${percentual}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-slate-300 text-right min-w-[92px]">
+                              {formatarMoeda(item.total)}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        ) : (
+          <>
         {/* Financial KPI Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
@@ -1066,6 +1408,8 @@ export default function App() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       {/* Modal Novo Gasto */}

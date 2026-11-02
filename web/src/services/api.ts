@@ -1,4 +1,12 @@
-import type { AuthResponse, BoletoRecorrente, Cartao, Gasto, ResumoFinanceiro, Usuario } from '../types'
+import type {
+  AnaliseFinanceira,
+  AuthResponse,
+  BoletoRecorrente,
+  Cartao,
+  Gasto,
+  ResumoFinanceiro,
+  Usuario,
+} from '../types'
 
 const API_BASE = '/api'
 
@@ -324,5 +332,14 @@ export const api = {
       method: 'DELETE',
     })
     if (!res.ok) throw new Error('Falha ao encerrar boleto recorrente')
+  },
+
+  async getAnalise(mes: number, ano: number): Promise<AnaliseFinanceira> {
+    const url = new URL(`${window.location.origin}${API_BASE}/analises`)
+    url.searchParams.set('mes', String(mes))
+    url.searchParams.set('ano', String(ano))
+    const res = await fetchWithAuth(url.toString())
+    if (!res.ok) throw new Error('Falha ao carregar as análises financeiras')
+    return res.json()
   },
 }

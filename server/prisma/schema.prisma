@@ -74,6 +74,7 @@ model BoletoRecorrente {
   diaVencimento   Int
   inicioEm        DateTime
   ativo           Boolean            @default(true)
+  encerradoEm     DateTime?
   usuarioId       String
   usuario         Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   ocorrencias     BoletoOcorrencia[]

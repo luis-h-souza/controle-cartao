@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../config/prisma.js'
+import { parcelaNaFatura } from '../utils/fatura.js'
 
 export const createGastoSchema = z.object({
   descricao: z.string().min(1, 'Descrição é obrigatória'),
@@ -24,32 +25,6 @@ function valorParcela(gasto: { valor: number; parcelas: number; parcelaAtual: nu
 function saldoParcelasEmAberto(gasto: { valor: number; parcelas: number; parcelaAtual: number }) {
   const parcelasRestantes = Math.max(0, gasto.parcelas - gasto.parcelaAtual + 1)
   return valorParcela(gasto) * parcelasRestantes
-}
-
-function parcelaNaFatura(
-  gasto: {
-    dataCompra: Date
-    parcelas: number
-    parcelaAtual: number
-    cartao: { diaFechamento: number; diaVencimento: number }
-  },
-  mesFatura: number,
-  anoFatura: number
-) {
-  const dataCompra = new Date(gasto.dataCompra)
-  const anoCompra = dataCompra.getUTCFullYear()
-  const mesCompra = dataCompra.getUTCMonth()
-  const ultimoDiaDoMes = new Date(Date.UTC(anoCompra, mesCompra + 1, 0)).getUTCDate()
-  const diaFechamento = Math.min(gasto.cartao.diaFechamento, ultimoDiaDoMes)
-  const fechamentoPosteriorAoVencimento = gasto.cartao.diaFechamento > gasto.cartao.diaVencimento
-  const primeiraFaturaOffset =
-    (dataCompra.getUTCDate() > diaFechamento ? 1 : 0) +
-    (fechamentoPosteriorAoVencimento ? 1 : 0)
-  const primeiraFatura = anoCompra * 12 + mesCompra + primeiraFaturaOffset
-  const faturaSelecionada = anoFatura * 12 + mesFatura - 1
-  const parcela = gasto.parcelaAtual + faturaSelecionada - primeiraFatura
-
-  return parcela >= gasto.parcelaAtual && parcela <= gasto.parcelas ? parcela : null
 }
 
 export class GastoController {

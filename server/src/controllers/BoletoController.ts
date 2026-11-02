@@ -144,9 +144,13 @@ export class BoletoController {
       if (!userId) return reply.status(401).send({ error: 'Usuário não autenticado' })
 
       const { id } = request.params
+      const agora = new Date()
+      const encerradoEm = new Date(
+        Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth() + 1, 1)
+      )
       const result = await prisma.boletoRecorrente.updateMany({
         where: { id, usuarioId: userId, ativo: true },
-        data: { ativo: false },
+        data: { ativo: false, encerradoEm },
       })
 
       if (result.count === 0) {
