@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   CreditCard,
   Plus,
@@ -20,6 +20,9 @@ import {
   CalendarDays,
   FileText,
   BarChart3,
+  LayoutDashboard,
+  Menu,
+  ChevronDown,
 } from 'lucide-react'
 import { api } from './services/api'
 import { useAuth } from './contexts/AuthContext'
@@ -88,6 +91,9 @@ export default function App() {
   const [modalBoletoAberto, setModalBoletoAberto] = useState(false)
   const [boletoValorEditando, setBoletoValorEditando] = useState<BoletoRecorrente | null>(null)
   const [modalPerfilAberto, setModalPerfilAberto] = useState(false)
+  const [menuMobileAberto, setMenuMobileAberto] = useState(false)
+  const [menuContaAberto, setMenuContaAberto] = useState(false)
+  const menuContaRef = useRef<HTMLDivElement>(null)
 
   // Form Gasto
   const [descricaoGasto, setDescricaoGasto] = useState('')
@@ -270,6 +276,26 @@ export default function App() {
       ativa = false
     }
   }, [user, telaAtiva, mesFatura, anoFatura, versaoAnalise])
+
+  useEffect(() => {
+    if (!menuContaAberto) return
+
+    const fecharAoClicarFora = (event: MouseEvent) => {
+      if (event.target instanceof Node && !menuContaRef.current?.contains(event.target)) {
+        setMenuContaAberto(false)
+      }
+    }
+    const fecharComEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuContaAberto(false)
+    }
+
+    document.addEventListener('mousedown', fecharAoClicarFora)
+    document.addEventListener('keydown', fecharComEscape)
+    return () => {
+      document.removeEventListener('mousedown', fecharAoClicarFora)
+      document.removeEventListener('keydown', fecharComEscape)
+    }
+  }, [menuContaAberto])
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -459,7 +485,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
       <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-0 sm:h-16 w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-0 sm:h-16 w-full flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 shrink-0">
               <CreditCard className="w-5 h-5 text-white" />
@@ -476,7 +502,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-1 sm:gap-3 w-full sm:w-auto">
+          <div className="hidden sm:flex items-center justify-end gap-3">
             <button
               onClick={abrirNovoCartao}
               aria-label="Novo cartão"
@@ -509,19 +535,19 @@ export default function App() {
               <span><span className="sm:hidden">Gasto</span><span className="hidden sm:inline">Novo Gasto</span></span>
             </button>
 
-            {/* User Profile, Edit & Logout */}
-            <div className="flex items-center gap-0.5 sm:gap-1 pl-1.5 sm:pl-3 border-l border-slate-800 ml-0.5 sm:ml-1 shrink-0">
+            <div className="relative pl-3 border-l border-slate-800" ref={menuContaRef}>
               <button
                 type="button"
-                onClick={() => setModalPerfilAberto(true)}
+                onClick={() => setMenuContaAberto((aberto) => !aberto)}
+                aria-label="Abrir opções da conta"
+                aria-expanded={menuContaAberto}
+                aria-controls="menu-conta-desktop"
                 className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-800/80 transition-all cursor-pointer text-left group"
-                title="Editar meu perfil"
               >
                 <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/40 group-hover:border-indigo-400 text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 transition-colors">
                   {user.nome.substring(0, 2).toUpperCase()}
                 </div>
-                <span className="text-[11px] sm:hidden">Perfil</span>
-                <div className="hidden md:block text-left">
+                <div className="text-left">
                   <div className="text-xs font-semibold text-slate-200 leading-tight truncate max-w-[120px] group-hover:text-indigo-300 transition-colors">
                     {user.nome}
                   </div>
@@ -529,28 +555,134 @@ export default function App() {
                     {user.email}
                   </div>
                 </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${menuContaAberto ? 'rotate-180' : ''}`} />
               </button>
 
-              <button
-                type="button"
-                onClick={() => setModalPerfilAberto(true)}
-                className="hidden sm:block p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                title="Editar perfil"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => logout()}
-                className="flex items-center gap-1 px-1.5 sm:p-2 text-[11px] sm:text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-                title="Sair da conta"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="sm:hidden">Sair</span>
-              </button>
+              {menuContaAberto && (
+                <div
+                  id="menu-conta-desktop"
+                  role="menu"
+                  className="absolute right-0 top-full mt-2 w-56 p-2 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl z-50"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuContaAberto(false)
+                      setModalPerfilAberto(true)
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-200 hover:bg-slate-800 transition-colors"
+                  >
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    Configurações
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuContaAberto(false)
+                      logout()
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 border-t border-slate-800 rounded-lg text-sm text-rose-300 hover:bg-rose-500/10 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sair
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMenuMobileAberto((aberto) => !aberto)}
+            aria-label={menuMobileAberto ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={menuMobileAberto}
+            aria-controls="menu-mobile"
+            className="sm:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 border border-slate-700/60 text-slate-200 hover:bg-slate-700 transition-colors"
+          >
+            {menuMobileAberto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          {menuMobileAberto && (
+            <div
+              id="menu-mobile"
+              className="sm:hidden absolute top-full right-4 left-4 mt-2 p-3 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl z-50"
+            >
+              <div className="flex items-center gap-3 px-2 py-3 mb-2 border-b border-slate-800">
+                <div className="w-10 h-10 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-bold text-sm flex items-center justify-center shrink-0">
+                  {user.nome.substring(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-100 truncate">{user.nome}</div>
+                  <div className="text-xs text-slate-400 truncate">{user.email}</div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuMobileAberto(false)
+                    abrirNovoCartao()
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-colors"
+                >
+                  <CreditCard className="w-4 h-4 text-indigo-400" />
+                  Novo cartão
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuMobileAberto(false)
+                    abrirNovoBoleto()
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  Novo boleto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuMobileAberto(false)
+                    if (cartoes.length === 0) {
+                      showFeedback('erro', 'Cadastre ao menos um cartão antes de registrar gastos.')
+                      abrirNovoCartao()
+                      return
+                    }
+                    setModalGastoAberto(true)
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-violet-400" />
+                  Novo gasto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuMobileAberto(false)
+                    setModalPerfilAberto(true)
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-slate-400" />
+                  Perfil e configurações
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuMobileAberto(false)
+                    logout()
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 mt-2 border-t border-slate-800 rounded-xl text-sm text-rose-300 hover:bg-rose-500/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sair
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -588,6 +720,7 @@ export default function App() {
                 : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
+            <LayoutDashboard className="w-4 h-4 inline-block mr-2 align-[-2px]" />
             Visão geral
           </button>
           <button
@@ -890,7 +1023,7 @@ export default function App() {
         ) : (
           <>
         {/* Financial KPI Cards */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Fatura {MESES[mesFatura - 1]}</span>
@@ -953,6 +1086,21 @@ export default function App() {
                 }`}
                 style={{ width: `${Math.min(100, resumo?.percentualUtilizado || 0)}%` }}
               ></div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700/60 transition-colors">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-xs font-medium uppercase tracking-wider">Boletos de {MESES[mesFatura - 1]}</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                <FileText className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-emerald-300">
+              {formatarMoeda(boletos.reduce((total, boleto) => total + boleto.valor, 0))}
+            </div>
+            <div className="text-xs text-slate-400 mt-2">
+              {boletos.length} {boletos.length === 1 ? 'boleto previsto' : 'boletos previstos'}
             </div>
           </div>
         </section>
